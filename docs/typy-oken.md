@@ -123,23 +123,29 @@ Tři pole stojí za vysvětlení:
 
 ## 2b. Kdo řekne, že okno krmí zrovna tahle apka
 
-`kind` a `app_id` jsou dvě osy — a musí je někdo **spojit**. Dělá to ten, kdo
-okno otevírá, tedy workbench. Nikdy apka sama:
+`kind` a `app_id` jsou dvě osy — a musí je někdo **spojit**. Dělá to
+**nabídka**: každé okno vzniká z nabídky a každá nabídka jmenuje apku
+(D-54). Nikdy ne apka sama.
 
 ```python
-w = screen.window.open("panel", id="hello",       # kind: jak se to vykreslí
-                       title="Hello",
-                       app="example.hello")        # app_id: odkud je obsah
+app_hello = inst.app.register(HelloApp())          # kind je v manifestu apky
+scr_ahoj.app.register(app_hello, title="Hello")    # nabídni ji na téhle ploše
 ```
 
-Bez `app=` je obsah **lokální** — dodá ho kód, který okno otevřel. S `app=`
-posílá instance `snapshot` i události do té apky.
+`kind` se v tom volání **neopakuje** — stojí v manifestu a napsat ho podruhé
+znamená dvě místa, která se dají rozejít (D-63).
+
+**Okno bez apky se nedeklaruje** (D-61). Dřív šel obsah dodat lokálně kódem,
+který okno otevřel; byla to druhá cesta, jak okno vyrobit, a ze dvou cest se
+jedna dřív nebo později přestane kontrolovat. Co dodává runtime, se registruje
+jako zdroj úplně stejně: `scr_ahoj.app.register(inst.log, title="Log")`.
 
 Celý řetěz od registrace po vykreslení:
 
 ```
 1. apka se zaregistruje                   → registr zná app_id "example.hello"
-   (POST na registr, nebo deklarace v konfiguraci u vestavěných)
+   (manifest u apky; chybějící manifest, chybějící app_id
+    i neznámý kind shodí registraci hned — D-53)
 
    { "app_id": "example.hello",
      "kind": "panel",                       ← který renderer používá
@@ -147,13 +153,15 @@ Celý řetěz od registrace po vykreslení:
      "backend_base_url": "http://hello-app:8080",
      "events": { "hello_submit": { "needs": "write", "profile": "request" } } }
 
-2. workbench otevře okno a spojí osy      → screen.window.open("panel", …, app="example.hello")
-                                             vazba (screen:ahoj/window:hello) → example.hello
+2. plocha ji nabídne                      → scr_ahoj.app.register(app_hello, title="Hello")
+                                             nabídka přežije zavření okna
 
-3. instance zavolá apku                   → create_instance(ref, spec, subject)
-                                             ref = {screen, window[, correlation]}
+3. divák si ji otevře                     → vznikne okno; vazba
+                                             (screen:ahoj/window:<id>) → example.hello
 
-4. klient dostane kind + obsah            → vykreslí rendererem "panel"
+4. instance zavolá apku                   → open_content(handle, spec, subject)
+
+5. klient dostane kind + obsah            → vykreslí rendererem "panel"
 ```
 
 **Apka se na okno nepřihlašuje sama.** Kdyby mohla, byl by to způsob, jak se
@@ -164,7 +172,7 @@ plochy" neexistuje a cizí `ref` v odpovědi instance odmítne a zapíše.
 
 | kdy | co se stane |
 |---|---|
-| `app=` **není v registru** při otevírání okna | `open()` **selže hned**, se seznamem registrovaných apek — chytá to překlepy |
+| apka nemá manifest, `app_id` nebo má neznámý `kind` | `inst.app.register()` **selže hned** — chyba autora se ozve při startu, ne až někomu nejde otevřít okno |
 | apka je registrovaná, ale **neodpovídá** (spadlý kontejner, restart) | okno se otevře jako rám s hláškou „obsah není dostupný"; instance na ni **nečeká** a ostatní okna to nezdrží |
 
 Rozdíl je podstatný: první případ je chyba autora a má se ozvat okamžitě,

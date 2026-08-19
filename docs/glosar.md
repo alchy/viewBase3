@@ -84,6 +84,23 @@ od jmenného prostoru někdo čekal (že zápis něco udělá — projde přes i
 a zapíše se do auditu), obstará property setter sám. Jmenný prostor by přidal
 jen slova a rozbil symetrii.
 
+## Prefixy proměnných v příkladech a testech
+
+V dokumentaci i v testech mají proměnné prefix podle druhu objektu. Není
+to kosmetika: bez něj je na řádku `uctarna.app.register(graf, …)` potřeba
+dohledat, které z těch dvou jmen je plocha a které apka.
+
+| druh | prefix | příklad |
+|---|---|---|
+| instance | `inst` | `inst = vb.Instance(...)` |
+| plocha | `scr_` | `scr_uctarna`, `scr_zasedacka` |
+| apka | `app_` | `app_excel`, `app_graf` |
+| obsah | `cnt_` | `cnt_mzdy`, `cnt_rizika` |
+| okno (za běhu) | `win_` | `win_log = scr_uctarna.window.get("log")` |
+
+Nabídka vlastní proměnnou obvykle nepotřebuje — `register` se volá pro
+efekt. Když je potřeba (test, pozdější změna práv), je to `off_`.
+
 ## Pojmenování v protokolu
 
 Na drátě se používají tatáž jména jako v kódu (`screen_id`, `window_id`,

@@ -47,8 +47,8 @@ Zbytek dokumentu je jen rozvedení těchhle šesti vět.
 
 Šestý bod není fráze — v jednom odpoledni podle něj padly tři věci, které
 už byly navržené: sloveso `manage` v ACL (dědičnost ho rozbíjela), ACL apky
-v průniku (patří spouštěči) a `window.open` při startu (okno si otevře
-divák). Model práv, který si člověk nedokáže představit v hlavě, se
+(nezavírala nic navíc a padla nakonec celá) a `window.open` při startu
+(okno si otevře divák). Model práv, který si člověk nedokáže představit v hlavě, se
 nastavuje zkusmo — a takhle nastavená práva jsou vždycky širší, než kdo
 chtěl. **Nesrozumitelnost je u autorizace bezpečnostní vada, ne estetická.**
 
@@ -608,10 +608,10 @@ dědit: obsah neleží na ploše, leží u apky.
 ### Objekty místo řetězců, manifest se neopakuje
 
 ```python
-inst   = vb.Instance(default_access=["group:users"])
-graf   = inst.app.register(GraphApp())        # app_id, kind i scope jsou v manifestu
-provoz = inst.screen.open(title="Provoz")
-provoz.app.register(graf, title="Síť")        # nabídni ji na téhle ploše
+inst       = vb.Instance(default_access=["group:users"])
+app_excel  = inst.app.register(ExcelApp())      # app_id, kind i scope jsou v manifestu
+scr_provoz = inst.screen.open(title="Provoz")
+scr_provoz.app.register(app_excel, title="Sešit")   # nabídni ji na téhle ploše
 inst.serve()
 ```
 
@@ -619,27 +619,27 @@ inst.serve()
 kde*; okna vznikají tím, že si je divák otevře. Je to poctivější (workbench
 je prostředí, ne scénář) a v kódu z toho zmizí celá jedna vrstva.
 
-Šest řádků, žádná id (přidělí se), žádná ACL (dědí se), žádná rukojeť (obsah
-vznikne s oknem). **To je měřítko, jestli je API jednoduché.**
+Pět řádků, žádná id (přidělí se), žádná ACL (dědí se), žádná rukojeť (obsah
+vznikne s nabídkou). **To je měřítko, jestli je API jednoduché.**
 
-Když je potřeba víc, přidává se po jednom:
+**Prefixy v příkladech jsou závazné.** `inst`, `scr_*`, `app_*`, `cnt_*` —
+na řádku `scr_uctarna.app.register(app_excel, …)` je pak z prvních tří
+znaků vidět, co se kam registruje, a nemusí se to dohledávat. Totéž platí
+v testech.
 
-```python
-graf   = inst.app.register(GraphApp(), read=["group:ucetni"])
-provoz = inst.screen.open(title="Provoz", id="provoz",
-                          read=["group:ucetni", "group:sklad"],
-                          write=["group:ucetni"])
+### Apka se registruje bez práv
 
-provoz.app.register(graf, title="Síť",           # nabídka na téhle ploše
-                    read=["group:ucetni", "group:sklad"],   # …a ACL oken,
-                    write=["group:ucetni"],                 #    která z ní vzniknou
-                    require_authentication=True)
-```
+`inst.app.register(ExcelApp())` **nebere `read` ani `write`.** Apka je
+jen deklarace „tenhle kód existuje a umí tenhle `kind`"; kdo ji uvidí,
+rozhoduje plocha a nabídka na ní.
 
-ACL se tedy deklaruje **na nabídce** a okno, které z ní vznikne, ho zdědí.
-Kdo chce práva jednoho konkrétního okna změnit za běhu, má pořád
-`w.access.read.add(…)` — jen se k tomu oknu dostane až tehdy, když existuje
-(`provoz.window.get("net")`).
+Byla tu jednu dobu i třetí ACL („skryj apku všem"), ale nezavírala nic,
+co plocha s nabídkou nezavřou taky — a globální vypínač existuje bez ní:
+odregistrovaná apka bere své nabídky s sebou. Adresa `app:<id>` zůstává,
+protože se na ni loguje a odkazuje `audience` tokenu; **práva nenese.**
+
+ACL tak žije na pěti objektech a nikde jinde: `instance:`, `screen:`,
+`screen:/window:`, `content:`, `instance:log`.
 
 ### Obsah se obvykle nevytváří — vznikne s nabídkou
 
@@ -647,25 +647,88 @@ Tohle je místo, kde se dá snadno napsat víc, než je potřeba. **Nabídka si
 obsah vyrobí sama** a její `read`/`write` jsou právy **okna**; obsah žádné
 vlastní ACL nedostane, takže se druhá úroveň vůbec nezapojí.
 
-Pojmenovaný obsah (`graf.content.open(...)`) je potřeba **jen ve třech
+Pojmenovaný obsah (`app_excel.content.open(...)`) je potřeba **jen ve třech
 případech** — a všechny mají společné, že obsah **přežije jedno okno**:
 
 | případ | proč nestačí nabídka |
 |---|---|
 | týž obsah na **dvou plochách** | nabídky jsou dvě, obsah má být jeden |
 | plní ho **dávková úloha** | musí existovat dřív, než někdo něco otevře, a je potřeba rukojeť |
-| **jiná práva na obsah než na okno** | „mapu vidí celá firma, kreslí do ní jen síťaři — ať visí kdekoli" |
+| **jiná práva na obsah než na okno** | „dokument vidí i ředitel, přepisuje ho jen účtárna — ať visí kdekoli" |
+
+### Úplný příklad: jeden excel, dvě oddělení
+
+Fiktivní tabulkový procesor. Účtárna má `Mzdy.xls`, risk má `Rizika.xls`,
+v zasedačce visí veřejná plocha. Je to všechno, co se dnes dá deklarovat —
+delší příklad než tenhle už neexistuje.
 
 ```python
-# běžné: jeden řádek, obsah vznikne s nabídkou
-uctarna.app.register(graf, title="Mzdy", read=["group:mzdy"], write=["user:hana"])
+import viewbase as vb
+from excel_app import ExcelApp
 
-# výjimka: týž graf na dvou plochách → obsah musí být pojmenovaný
-mapa = graf.content.open(name="Mapa sítě",
-                         read=["group:zamestnanci"], write=["group:site"])
-hala.app.register(graf,    title="Mapa sítě", content=mapa)
-uctarna.app.register(graf, title="Mapa sítě", content=mapa)
+# ── 1. instance ─────────────────────────────────────────────────────────────
+inst = vb.Instance(default_access=["group:zamestnanci"])
+
+# ── 2. apka: jen deklarace, žádná práva ────────────────────────────────────
+app_excel = inst.app.register(ExcelApp())
+
+# ── 3. plochy: jedna na oddělení, jedna veřejná ────────────────────────────
+scr_uctarna = inst.screen.open(title="Účtárna", id="uctarna",
+                               read=["group:uctarna"], write=["group:uctarna"])
+
+scr_risk = inst.screen.open(title="Risk", id="risk",
+                            read=["group:risk"], write=["group:risk"])
+
+scr_zasedacka = inst.screen.open(title="Zasedačka", id="zasedacka",
+                                 read=["group:public"], write=[])   # [] = nikdo
+
+# ── 4. dokumenty: obsah, který přežije zavření okna ────────────────────────
+cnt_mzdy = app_excel.content.open(name="Mzdy.xls",
+                                  read=["group:uctarna", "user:novak"],
+                                  write=["group:uctarna"])
+
+cnt_rizika = app_excel.content.open(name="Rizika.xls",
+                                    read=["group:risk", "user:novak"],
+                                    write=["group:risk"])
+
+# ── 5. nabídky: co jde kde otevřít ─────────────────────────────────────────
+scr_uctarna.app.register(app_excel, title="Mzdy.xls", content=cnt_mzdy,
+                         require_authentication=True)   # navíc si řekne o kód
+scr_uctarna.app.register(app_excel, title="Nový sešit")  # bez content
+
+scr_risk.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
+scr_risk.app.register(app_excel, title="Mzdy.xls",   content=cnt_mzdy)
+
+scr_zasedacka.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
+
+inst.serve()
 ```
+
+Lidé: `user:hana` je v `group:uctarna`, `user:petr` v `group:risk`,
+`user:novak` (finanční ředitel) v `group:risk` a jmenovitě v obou
+dokumentech.
+
+| kdo | plochy | v nabídce | zapíše |
+|---|---|---|---|
+| **hana** | Účtárna, Zasedačka | Mzdy.xls 🔒, Nový sešit | Mzdy.xls |
+| **petr** | Risk, Zasedačka | Rizika.xls (na obou) | jen na ploše Risk |
+| **novak** | Risk, Zasedačka | Rizika.xls, **Mzdy.xls** | Rizika.xls |
+| **anonym** | Zasedačka | — | — |
+
+Tři řádky té tabulky jsou celý model práv:
+
+1. **Táž nabídka, táž plocha, dva různí lidé.** `Mzdy.xls` na ploše Risk
+   vidí novak a nevidí petr — oba plochu vidí stejně. Rozhodl **obsah**,
+   ne plocha.
+2. **Týž dokument, dvě plochy, jiné chování.** `Rizika.xls` se na ploše
+   Risk edituje a v zasedačce jen čte, protože zasedačka má `write=[]`.
+   O interakci rozhoduje **okno**, o datech **obsah** — a musí pustit obojí.
+3. **Omyl, který nic neprozradí.** Kdyby někdo přidal `Mzdy.xls` do
+   zasedačky, anonym neuvidí nic: plocha ho pustí, obsah ne. **Položit
+   dokument na veřejnou plochu ho nezveřejní.**
+
+A `Nový sešit` je nabídka bez obsahu: dokument vznikne až kliknutím a patří
+tomu, kdo klikl.
 
 Pořadí, ve kterém se prostředí deklaruje, je pak vždycky stejné:
 **instance → apky → (obsahy, výjimečně) → nabídky na plochy.** Okna v tom
@@ -673,16 +736,17 @@ seznamu nejsou schválně.
 
 Dvě pravidla, která ten tvar drží:
 
-1. **Co je v manifestu, se v kódu nepíše znovu.** `register(GraphApp())` si
+1. **Co je v manifestu, se v kódu nepíše znovu.** `register(ExcelApp())` si
    `app_id`, `kind` i `scope` vezme odtamtud — jinak se to dá rozejít.
-2. **Objekty místo řetězců.** `window.open(app=graf, content=g)`, ne
-   `app="workbench.graph", handle="vb1_…"`. Řetězce patří do konfigurace
-   a na drát, ne do volání.
+   Registrace ta pole **nesmí přebít**; kdo potřebuje jiný `kind`, mění
+   manifest, ne volání.
+2. **Objekty místo řetězců.** `content=cnt_mzdy`, ne `handle="vb1_…"`.
+   Řetězce patří do konfigurace a na drát, ne do volání.
 
 ### Nabídka: jediné sloveso
 
 ```python
-provoz.app.register(graf, title="Síť")   # tuhle apku jde na téhle ploše otevřít
+scr_provoz.app.register(app_excel, title="Sešit")   # tuhle apku jde na téhle ploše otevřít
 ```
 
 **Žádné `open`.** Okno si otevře divák z nabídky, vždycky. Zvažovali jsme
@@ -707,7 +771,7 @@ obsah    (stav u apky)         žije podle scope
 
 **Žádnou novou plochu práv to nepřidává:** nabídku uvidí ten, kdo vidí plochu
 i apku. Po kliknutí rozhodne `scope`, co s obsahem — odvozený vznikne sám,
-u `explicit` se nejdřív nabídne výběr (*Nový graf / Graph #1 / …*).
+u `explicit` se nejdřív nabídne výběr (*Nový sešit / Mzdy.xls / …*).
 
 Dvě slovesa místo příznaku schválně: `open(..., open_on_start=False)` se čte
 jako „otevři, ale neotevírej", a u volání pak nikdo neví, co ta `False`
