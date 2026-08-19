@@ -641,6 +641,36 @@ Kdo chce práva jednoho konkrétního okna změnit za běhu, má pořád
 `w.access.read.add(…)` — jen se k tomu oknu dostane až tehdy, když existuje
 (`provoz.window.get("net")`).
 
+### Obsah se obvykle nevytváří — vznikne s nabídkou
+
+Tohle je místo, kde se dá snadno napsat víc, než je potřeba. **Nabídka si
+obsah vyrobí sama** a její `read`/`write` jsou právy **okna**; obsah žádné
+vlastní ACL nedostane, takže se druhá úroveň vůbec nezapojí.
+
+Pojmenovaný obsah (`graf.content.open(...)`) je potřeba **jen ve třech
+případech** — a všechny mají společné, že obsah **přežije jedno okno**:
+
+| případ | proč nestačí nabídka |
+|---|---|
+| týž obsah na **dvou plochách** | nabídky jsou dvě, obsah má být jeden |
+| plní ho **dávková úloha** | musí existovat dřív, než někdo něco otevře, a je potřeba rukojeť |
+| **jiná práva na obsah než na okno** | „mapu vidí celá firma, kreslí do ní jen síťaři — ať visí kdekoli" |
+
+```python
+# běžné: jeden řádek, obsah vznikne s nabídkou
+uctarna.app.register(graf, title="Mzdy", read=["group:mzdy"], write=["user:hana"])
+
+# výjimka: týž graf na dvou plochách → obsah musí být pojmenovaný
+mapa = graf.content.open(name="Mapa sítě",
+                         read=["group:zamestnanci"], write=["group:site"])
+hala.app.register(graf,    title="Mapa sítě", content=mapa)
+uctarna.app.register(graf, title="Mapa sítě", content=mapa)
+```
+
+Pořadí, ve kterém se prostředí deklaruje, je pak vždycky stejné:
+**instance → apky → (obsahy, výjimečně) → nabídky na plochy.** Okna v tom
+seznamu nejsou schválně.
+
 Dvě pravidla, která ten tvar drží:
 
 1. **Co je v manifestu, se v kódu nepíše znovu.** `register(GraphApp())` si
