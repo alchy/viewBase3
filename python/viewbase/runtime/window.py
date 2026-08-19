@@ -11,6 +11,18 @@ from ..core.addressing import Address
 from .access_facade import AccessFacade, AccessOwner
 from .content import ContentState
 
+#: Slovnik schopnosti, ktere se posilaji apce (D-49). Uzavreny zamerne: ctvrta
+#: schopnost je rozhodnuti, ne dodatek.
+#:
+#:   read    smi videt obsah tohohle okna
+#:   write   smi do nej zasahovat
+#:   manage  smi s obsahem delat nevratne veci (vlastnik NEBO spravce)
+#:
+#: Jmena rikaji, CO clovek smi, ne KDO je. Kdyby apka dostala "je spravce",
+#: musela by si pravidlo "spravce smi i cizi" odvodit sama - a to je druhe
+#: misto, kde totez pravidlo zije.
+CAPABILITIES = ("read", "write", "manage")
+
 
 @dataclass(frozen=True, slots=True)
 class WindowApp:
@@ -90,9 +102,12 @@ class Window:
 
           read   smi videt obsah tohohle okna
           write  smi do nej zasahovat
-          own    smi s obsahem delat nevratne veci (D-41: vlastnik nebo
-                 spravce). Je to odpoved, ne role - apka se nedozvi, ze
-                 nekdo je spravce, jen ze na tohle ma.
+          manage smi s obsahem delat nevratne veci (D-41: vlastnik nebo
+                 spravce). Je to odpoved, ne role - apka se NEDOZVI, kdo
+                 z nich to je, jen ze na to ma. Kdyby dostala "je
+                 spravce", musela by si pravidlo "spravce smi i cizi"
+                 odvodit sama - a to je druhe misto, kde totez pravidlo
+                 zije (D-49).
         """
         from .events import Needs
 
@@ -107,7 +122,7 @@ class Window:
             and self._app.handle is not None
             and instance.content.may_destroy(self._app.handle, caller)
         ):
-            capabilities.append("own")
+            capabilities.append("manage")
         return capabilities
 
     def menu_for(self, caller) -> list[dict]:

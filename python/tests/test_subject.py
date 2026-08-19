@@ -178,7 +178,7 @@ def test_the_snapshot_reaches_the_app_when_the_viewer_may_see():
 # ===========================================================================
 
 
-def test_the_owner_of_the_content_is_told_so():
+def test_the_owner_of_the_content_may_manage_it():
     backend = RecordingApp()
     instance, screen = prepared(backend)
     screen.access.see.set(["group:users"])
@@ -191,10 +191,10 @@ def test_the_owner_of_the_content_is_told_so():
 
     window.snapshot_for(Caller.for_user("hana"))
 
-    assert "own" in backend.subjects[-1]["capabilities"]
+    assert "manage" in backend.subjects[-1]["capabilities"]
 
 
-def test_someone_else_is_not_told_they_own_it():
+def test_someone_else_may_not_manage_it():
     backend = RecordingApp()
     instance, screen = prepared(backend)
     screen.access.see.set(["group:users"])
@@ -207,12 +207,13 @@ def test_someone_else_is_not_told_they_own_it():
 
     window.snapshot_for(Caller.for_user("petr"))
 
-    assert "own" not in backend.subjects[-1]["capabilities"]
+    assert "manage" not in backend.subjects[-1]["capabilities"]
 
 
 def test_the_administrator_reaches_a_foreign_content_through_a_capability():
     # F-18 navrhoval poslat apce skupiny. Tohle je tataz vec bez nich: apka
-    # dostane UZ ROZHODNUTOU odpoved na otazku, kterou by jinak resila sama.
+    # dostane UZ ROZHODNUTOU odpoved na otazku, kterou by jinak resila sama -
+    # a hlavne se NEDOZVI, jestli je to vlastnik, nebo spravce (D-49).
     backend = RecordingApp()
     instance, screen = prepared(backend)
     screen.access.see.set(["group:users"])
@@ -225,7 +226,7 @@ def test_the_administrator_reaches_a_foreign_content_through_a_capability():
 
     window.snapshot_for(Caller.for_user("spravce", ["administrator"]))
 
-    assert "own" in backend.subjects[-1]["capabilities"]
+    assert "manage" in backend.subjects[-1]["capabilities"]
 
 
 def test_the_app_still_never_learns_a_group():
@@ -271,3 +272,40 @@ def test_every_protocol_method_matches_what_the_runtime_calls(method, expected):
     # Kdo pise apku podle Protocolu, ma podle nej napsat metodu, ktera se
     # opravdu zavola - jinak to spadne az za behu u nej, ne u nas.
     assert list(inspect.signature(getattr(AppBackend, method)).parameters) == expected
+
+
+# ===========================================================================
+# Slovnik schopnosti je uzavreny (D-49)
+# ===========================================================================
+
+
+def test_the_capability_vocabulary_is_exactly_three_words():
+    # Testuje se SEZNAM, ne chovani: kdyz nekdo pristi rok pridá ctvrtou
+    # schopnost, ma o tom padnout rozhodnuti, ne se to zjistit u apky.
+    from viewbase.runtime.window import CAPABILITIES
+
+    assert CAPABILITIES == ("read", "write", "manage")
+
+
+def test_the_app_is_never_told_a_role():
+    # 'own' se cte jako sloveso, 'admin' jmenuje roli. Schopnost pojmenovava,
+    # co clovek smi - kdyby apka dostala "je spravce", musela by si pravidlo
+    # "spravce smi i cizi" odvodit sama a to je druhe misto, kde totez zije.
+    from viewbase.runtime.window import CAPABILITIES
+
+    assert "admin" not in CAPABILITIES
+    assert "own" not in CAPABILITIES
+
+
+def test_capabilities_come_out_in_the_declared_order():
+    backend = RecordingApp()
+    instance, screen = prepared(backend)
+    screen.access.see.set(["group:users"])
+    screen.access.write.set(["group:users"])
+    window = screen.window.open(
+        "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
+    )
+    window.access.see.set(["group:users"])
+    window.access.write.set(["group:users"])
+
+    assert window.capabilities_for(Caller.for_user("hana")) == ["read", "write", "manage"]

@@ -35,10 +35,18 @@ def test_nothing_else_leaks_out_of_the_package():
     # Zamerne se NEPTAME pres dir(): balicek si `__dir__` prepisuje na `__all__`
     # kvuli napovede, takze pres nej by tenhle test nesel nikdy shodit. Ptame se
     # na skutecny jmenny prostor modulu.
-    public = {name for name in vars(vb) if not name.startswith("_")}
-    # `core` a `runtime` jsou podbalicky - Python je do jmenneho prostoru vlozi
-    # sam, jakmile se z nich neco importuje. Nic jineho tam byt nesmi.
-    assert public - set(vb.__all__) - {"core", "runtime"} == set()
+    #
+    # Podmoduly se vyjimaji: Python je do jmenneho prostoru vlozi SAM, jakmile
+    # je nekdo naimportuje, takze jejich pritomnost neni rozhodnuti o API.
+    # Hlida se to, co API opravdu tvori - tridy a funkce.
+    import types
+
+    public = {
+        name
+        for name, value in vars(vb).items()
+        if not name.startswith("_") and not isinstance(value, types.ModuleType)
+    }
+    assert public - set(vb.__all__) == set()
 
 
 def test_the_developer_never_imports_from_core():
