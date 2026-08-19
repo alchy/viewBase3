@@ -88,7 +88,7 @@ ctx = {
 
   send(event, payload),  // zpráva na server (jde přes Workbench, ne přímo)
   on(action, handler),   // zprávy ze serveru mimo `update`
-  state,                 // per-instance úložiště, přežije překreslení, NE reload
+  state,                 // KLIENTSKÁ MEZIPAMĚŤ (viz níž) – ne stav aplikace
 
   frame(callback),       // takt místo requestAnimationFrame (viz §6)
   idle(callback),
@@ -99,7 +99,14 @@ ctx = {
 }
 ```
 
-Dvě věci na tom stojí za zdůraznění:
+Tři věci na tom stojí za zdůraznění:
+
+- **`ctx.state` není stav aplikace.** Je to klientská mezipaměť pro věci,
+  které se dají kdykoli zahodit a znovu spočítat: pozice scrollbaru,
+  rozbalený uzel stromu, poslední zvolená záložka. Přežije překreslení,
+  **nepřežije reload** a **není sdílená mezi diváky**. Pravda o stavu žije
+  na serveru; co si autor uloží sem, po reloadu zmizí — a u sdíleného obsahu
+  bude mít každý divák něco jiného, aniž by se to nějak projevilo.
 
 - **`ctx.root` je hranice.** Modul smí sahat pod něj, nikam jinam. Rám,
   lišta, menu, ostatní okna a `document` nejsou jeho.
@@ -126,7 +133,8 @@ u důvěryhodného to hlídá review a testy.
 | trvale běžící smyčka (`setInterval`, vlastní rAF) | okno mimo obraz musí opravdu spát (§6) |
 
 **Co okno naopak smí bez ptaní:** kreslit do `ctx.root`, používat `ctx.ui`,
-posílat události, držet si stav v `ctx.state`, číst téma a velikost, logovat.
+posílat události, odkládat si do `ctx.state` zahoditelnou mezipaměť, číst
+téma a velikost, logovat.
 
 ## 5. Schopnosti a stupně důvěry
 
@@ -150,7 +158,27 @@ modul se to dozví jako `undefined`, ne jako runtime chyba uprostřed práce.
 | `clipboard-write` | „zkopírovat výsledek" | exfiltrace do schránky |
 | `file-drop` | přetažení souboru do okna | vstup zvenčí |
 | `download` | vygenerovaný soubor | únik dat |
-| `fetch-origin` | volání na **vlastní** backend apky, přes proxy Workbenche | další cesta ven — jen `trusted` |
+| `fetch-origin` | volání na **vlastní** backend apky, přes proxy Workbenche | další cesta ven |
+
+### Která schopnost je dostupná kterému stupni
+
+Bez téhle tabulky by se registrace izolované apky se schopností
+`fetch-origin` buď tiše povolila, nebo selhala bez srozumitelného důvodu.
+Je to vynucovací místo, a ta mají být pojmenovaná:
+
+| schopnost | `core` | `trusted` | `sandboxed` |
+|---|---|---|---|
+| `canvas2d` | ano | ano | ano |
+| `webgl` | ano | ano | ano (vlastní kontext, vyšší cena) |
+| `keyboard-capture` | ano | ano | ano (mimo klávesy rezervované WM, §7) |
+| `clipboard-write` | ano | ano | jen na přímé gesto diváka |
+| `file-drop` | ano | ano | ano |
+| `download` | ano | ano | jen na přímé gesto diváka |
+| `fetch-origin` | ano | ano | **ne** — izolované okno nemá druhou cestu ven |
+
+Nedostupná kombinace se odmítne **při registraci**, ne za běhu, a s důvodem
+v logu. Kdo `fetch-origin` opravdu potřebuje, žádá zároveň o `trusted` — a to
+je vědomé rozhodnutí správce.
 
 Stupně důvěry (viz [review](review-workbench-apps.md), výhrada 3):
 

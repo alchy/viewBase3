@@ -96,15 +96,24 @@ class Message:
     payload: dict
     audience: Audience          # POVINNÉ, není default
 
-class Audience:
-    """Komu se smí doručit. Vyhodnocuje se proti principálům relace."""
-    principals: frozenset[str] | None   # None = jen adresné (viz níž)
-    only_session: str | None = None     # přesně jedna relace
-    needs_grant: str | None = None      # kdo má krok navíc k tomuhle objektu
+# Publikum má dva tvary a OBA se vyhodnocují až při doručení:
+Ref(address, verb)      # „kdo smí VIDĚT screen:provoz/window:mzdy"
+Session(sid)            # přímá odpověď jednomu volajícímu
+And(a, b)               # obojí zároveň (odpověď mně, ale jen když na to mám)
 ```
 
-Vysílací smyčka pak **neví nic o oknech ani o právech** — jen se ptá
-`audience.allows(session)`. Objekty naopak nevědí nic o soketech.
+**Pozdní vazba je povinná, ne volitelná.** Zmrazit množinu principálů při
+vzniku zprávy je lákavé (publikum by bylo čistá hodnota), ale delta vyrobená
+vteřinu před odebráním práv by se doručila i po něm. Proto se publikum
+neptá „kdo to byl", ale **„kdo to smí teď"**.
+
+Množina principálů proto v `Audience` vůbec není — a to je záměr: neexistuje
+tvar, kterým by šlo publikum omylem zmrazit.
+
+Vysílací smyčka pak **neví nic o oknech ani o právech** — dostane při startu
+jedinou funkci `resolve(address) -> Acl` a ptá se
+`audience.allows(caller, resolve)`. Jedna předaná funkce, žádný import
+napříč vrstvami. Objekty naopak nevědí nic o soketech.
 
 Praktický důsledek: `LogView` je jen další zdroj zpráv s vlastním publikem.
 Ve viewBase2 byl log stream doručovaný stranou a jeho ACL se braly ze
@@ -178,10 +187,25 @@ u každé události a nesmí jít vypnout.** Deklarace při registraci smí ří
 jen, co se žádá *navíc*:
 
 ```python
-register("shell_input",   handler, needs=Needs.USE)      # okno: zasahovat + krok navíc
-register("window_unlock", handler, needs=Needs.UNLOCK)   # okno: vidět, bez kroku navíc
-register("menu_select",   handler, needs=Needs.SCREEN)   # jen brána plochy
+register("shell_input",   handler, needs=Needs.WRITE)
+register("window_unlock", handler, needs=Needs.SEE, step_up=StepUp.EXEMPT)
+register("menu_select",   handler, needs=Needs.SCREEN)
 ```
+
+Enum je **úplný** a nemá hodnotu, která by kontrolu vypínala:
+
+| `needs` | brána plochy | okno vidět | okno zasahovat |
+|---|---|---|---|
+| `INSTANCE` | – (událost se netýká plochy: správa instance) | – | – |
+| `SCREEN` | zasahovat | – | – |
+| `SEE` | vidět | ano | – |
+| `WRITE` | zasahovat | ano | ano |
+
+**Krok navíc je druhá, nezávislá osa**, ne pátá hodnota. `step_up` je
+`REQUIRED` (výchozí); `EXEMPT` má **jediná** událost — `window_unlock`,
+protože ta je právě tou cestou, kterou se krok navíc získává. Výjimka je
+tím deklarovaná, ne schovaná v komentáři, a strojový test hlídá, že ji nemá
+nikdo jiný.
 
 Ve viewBase2 existovala hodnota `NONE` ve významu „nekontroluj nic" — a
 `shell_new`, `menu_select` i každá uživatelská událost se daly zavolat na
@@ -293,29 +317,33 @@ začátku:
 
 ## 11. Rozvržení modulů
 
-Návrh, který drží závislosti jedním směrem:
+Jeden strom, závislosti jdou jedním směrem:
 
 ```
-core/
-  identity.py     principálové; čisté funkce, žádné závislosti
-  access.py       Acl, Access, allowed(); závisí jen na identity
-  audience.py     komu se zpráva smí doručit
-  addressing.py   opaque id, adresa rodič/dítě
-runtime/
-  instance.py     Instance: vlastní politiku, relace, log, zdroj identit
-  sessions.py     tabulka relací, principálové, kroky navíc
-  registry.py     objekty instance podle adresy
-  events.py       registr událostí + JEDINÉ vynucovací místo
-transport/
-  protocol.py     tvar zpráv (bez logiky)
-  server.py       sokety, handshake, multiplexing; nezná práva
-  rest.py         programový vstup; jen převede token na Caller
-providers/
-  identity_file.py, identity_ldap.py     kdo je kdo
-  policy_file.py, policy_db.py           co smí naše objekty
-surfaces/
-  screen.py, window/*.py                 obsah; nezná sokety ani práva
+python/viewbase/
+  core/         identity, access, audience, addressing   ← nezávisí na NIČEM
+  runtime/      instance, sessions, registry, events, screen, window (rám)
+  transport/    protocol, server, rest
+  providers/    identity_file, identity_ldap, policy_file, policy_db
+  types/<kind>/ manifest.json, model.py, schema.json, client/, tests/
+  static/       sestavený frontend (viz §12.4)
+frontend/       workbench: chrome, WM, registr rendererů, loader typů
+python/tests/   testy jádra a integrace
+examples/  docs/
 ```
+
+**Typ okna je jedna složka a leží uvnitř balíčku.** Vypadá zvláštně mít JS
+v pythonovém stromu, ale je to tím, že typ okna *je* jeden celek: model,
+renderer, schéma i testy patří k sobě a mají se přesouvat najednou (viz
+[typy-oken.md](typy-oken.md)). Python se importuje přirozeně
+(`viewbase.types.panel.model`), build frontendu si posbírá
+`types/*/client/` a wheel obsahuje obojí — takže **publikovaný typ třetí
+strany má úplně stejný tvar jako vestavěný**, jen se instaluje zvlášť.
+
+`Screen` a `Window` v `runtime/` jsou **rám**, ne obsah: geometrie, z-order,
+titulek, zámek. Obsah okna žije celý v `types/`. (Dřívější `surfaces/`
+v tomhle dokumentu byl zbytek staršího návrhu a **zaniká** — dvě rozvržení
+vedle sebe byla chyba, viz nález F-01.)
 
 Pravidlo: **`core/` nezávisí na ničem**, takže se celá autorizační logika
 testuje bez serveru. Ve viewBase2 to `access.py` splňuje a je to nejzdravější
@@ -325,21 +353,46 @@ kus projektu — stojí za to to udržet jako tvrdé pravidlo, ne náhodu.
 
 Otázky, na které viewBase2 odpovídal postupně a stálo to přepisování:
 
-1. **Jeden proces, nebo víc?** Pokud se počítá s tím, že část ploch převezme
-   jiný kontejner, musí být adresa objektu neprůhledná a stabilní od
-   začátku a stav relace musí být přenositelný (nebo výslovně nepřenositelný
-   a klient to musí umět).
+1. **Jeden proces, nebo víc?** — ✅ **rozhodnuto: M0 je knihovna v jednom
+   procesu, ale připravená na rozdělení.** Adresa objektu je od začátku
+   neprůhledná a serializovatelná, hranice vrstev mají DTO a platí tvrdé
+   pravidlo o směru závislostí. Kontejner kdykoli potom; nic v M0 ho nesmí
+   vyloučit.
+
+   **A zůstává to knihovna i potom.** Až část kódu poběží jako služba, je to
+   jen jiný způsob *nasazení* — ne jiný způsob, jak je to napsané. Veřejné
+   API se dál čte jako knihovna (`import viewbase as vb`, objekty a metody,
+   ne roury a zprávy), scaffold se staví po blocích, které dávají smysl samy
+   o sobě, a hranice mezi nimi jsou rozhraní, ne síťová volání. Služba se
+   pak z bloku udělá tak, že se za rozhraní postaví přenos — a volající to
+   nepozná.
+
+   Praktický důsledek pro každý blok: **musí jít použít i sám**, s falešnými
+   sousedy a bez serveru. Když se blok nedá vzít do ruky zvlášť, není to
+   blok, ale slepenec — a to je přesně ten stav, ze kterého viewBase3
+   vzniká.
 2. **Kde končí knihovna a začíná aplikace?** viewBase2 došel k tomu, že
    aplikace **nezakládá identity** — jen jmenuje principály na svých
    prvcích. Je to dobré rozhodnutí, ale musí padnout dřív, protože z něj
    plyne existence samostatného nástroje správce.
-3. **Jazyk identifikátorů.** Anglicky. (Komentáře v jakémkoli jazyce, ale
-   jména v kódu ne.) Přejmenovávat to potom je průchod celým repozitářem
-   a past se skrývá v řetězcích — jméno parametru cesty v routě, klíče
-   payloadu, jména v konfiguraci.
-4. **Sestavený frontend: v gitu, nebo ne?** Pokud ano, musí existovat
-   kontrola, že bundle odpovídá zdrojům — jinak se dřív nebo později
-   nasadí starý.
+3. **Jazyk.** — ✅ **rozhodnuto.** Anglicky: identifikátory, jména souborů,
+   klíče payloadu, parametry cest v routách, jména v konfiguraci. Česky:
+   docstringy a komentáře. Audit anglicky a sloupcově (strojově čitelný).
+   Texty pro diváka anglicky, ale server posílá **klíč a parametry**, ne
+   hotovou větu — jinak se to později nedá přeložit. Přejmenovávat potom je
+   průchod celým repozitářem a past se skrývá v řetězcích.
+4. **Sestavený frontend: v gitu, nebo ne?** — ✅ **rozhodnuto: v gitu**,
+   protože záměr je knihovna, kterou jde vložit do cizího projektu jedním
+   `pip install git+…` bez Node.js. **Podmínkou je kontrola**: vedle bundlu
+   leží `static/BUNDLE.sha256` s otiskem zdrojů frontendu a test ho
+   přepočítá. Nesoulad = červené CI. Bez té kontroly se chyba 3.13
+   (nasazený starý bundle) vrátí, je to jen otázka času.
+
+   **Frontend zůstává vanilla JS + Vite** (bez TypeScriptu). Důsledek:
+   `schema/` nemůže generovat typy pro klienta, takže je **jedinou pravdou
+   za běhu** — validátor na obou stranách a jedna sada fixtur, kterou
+   prochází server i klient. Bez toho se strany rozejdou a nikdo si toho
+   nevšimne.
 5. **Co je veřejné API.** viewBase2 to má popsané až zpětně. Rozhodnout
    dřív znamená, že se vnitřek dá měnit bez ohledů.
 

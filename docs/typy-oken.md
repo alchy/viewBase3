@@ -77,10 +77,28 @@ položka není výchozí hodnota, ale chyba registrace.
 
 Tři pole stojí za vysvětlení:
 
-- **`content: shared | per-session`** — viz [review](review-workbench-apps.md),
-  výhrada 1. Sdílený obsah vidí všichni, kdo okno vidí; soukromý má instanci
-  per relaci. Shell a formuláře jsou soukromé, graf a log sdílené. Bez
-  téhle deklarace nejde bezpečně rozeslat deltu.
+- **`content: shared | per-session | instance`** — viz
+  [review](review-workbench-apps.md), výhrada 1. Bez téhle deklarace nejde
+  bezpečně rozeslat deltu:
+
+  | hodnota | model drží runtime na klíč | publikum delty |
+  |---|---|---|
+  | `shared` | `(screen, window)` | ACL **okna** — kdo okno vidí, vidí totéž |
+  | `per-session` | `(screen, window, session)` | ta **jedna relace** |
+  | `instance` | `(instance, kind)` | **vlastní ACL objektu**, ne ACL okna |
+
+  Graf je `shared`, shell a formuláře `per-session`, log je `instance`.
+  Třetí hodnota vznikla z nálezu: „sdílený" znamená „kdo okno vidí, vidí
+  totéž" — a přesně tahle definice vedla ve viewBase2 k úniku auditní stopy,
+  protože log okno na veřejné ploše zpřístupnilo obsah, který s tou plochou
+  nemá nic společného. Obsah, který je instance-wide, musí mít **vlastní**
+  ACL a nedědit ho od místa, kde se náhodou zobrazuje.
+
+  U `per-session` model **nikdy nefiltruje sám** a `snapshot(for_session)` je
+  triviální. Zavírá to i výhradu 4 z review (apka nedostává skupiny): není
+  co filtrovat. Nová relace téhož člověka začíná **prázdným stavem** — shell
+  se nepřenáší; přenos až tehdy, když o něj někdo požádá a bude jasné, co to
+  znamená pro krok navíc.
 - **`events[].needs`** — co událost žádá o přístup (brána plochy platí
   vždycky; `needs` říká, co navíc). Povinné, jinak registrace selže.
 - **`events[].profile`** — `request` (HTTP na apku) / `stream` (trvalý kanál)
@@ -104,11 +122,11 @@ Návrh sady na zelené louce, včetně toho, co z viewBase2 sloučit:
 | `kind` | k čemu | obsah | schopnosti | poznámka |
 |---|---|---|---|---|
 | **`panel`** | prvky ze serveru: nadpisy, tabulky, pole, tlačítka, grafy hodnot | podle apky | – | **výchozí typ**; sloučení dnešního `HtmlWindow` + `ControlWindow` |
-| **`doc`** | sanovaný HTML/Markdown dokument | sdílený | – | reporty, nápověda |
-| **`graph`** | živý 2D/3D graf | sdílený | `webgl` | fyzika běží v prohlížeči, server posílá topologii |
-| **`console`** | aplikační konzole: řádky + vstup | per-session | – | dnešní `TerminalWindow` |
-| **`shell`** | skutečný terminál nad procesem | per-session | `keyboard-capture` | dnešní `ShellWindow`; vždy krok navíc |
-| **`log`** | proud auditní stopy instance | sdílený | – | obsah dodává **runtime**, ne apka; vlastní ACL |
+| **`doc`** | sanovaný HTML/Markdown dokument | `shared` | – | reporty, nápověda |
+| **`graph`** | živý 2D/3D graf | `shared` | `webgl` | fyzika běží v prohlížeči, server posílá topologii |
+| **`console`** | aplikační konzole: řádky + vstup | `per-session` | – | dnešní `TerminalWindow` |
+| **`shell`** | skutečný terminál nad procesem | `per-session` | `keyboard-capture` | dnešní `ShellWindow`; vždy krok navíc |
+| **`log`** | proud auditní stopy instance | **instance** | – | obsah dodává **runtime**, ne apka; vlastní ACL |
 
 Čtyři poznámky k tomu:
 
@@ -127,24 +145,31 @@ Návrh sady na zelené louce, včetně toho, co z viewBase2 sloučit:
 
 ## 5. Rozvržení v repozitáři
 
-Typ okna je **jedna složka**, ne kus rozprostřený mezi backend a frontend:
+Typ okna je **jedna složka**, ne kus rozprostřený mezi backend a frontend —
+a leží **uvnitř balíčku**, aby měl publikovaný typ třetí strany úplně stejný
+tvar jako vestavěný:
 
 ```
-types/
+python/viewbase/types/
   panel/
     manifest.json
-    server/model.py          snapshot, apply_event, delty
-    client/index.js          mount/update/resize/unmount
-    schema/messages.json     tvar zpráv (generuje typy pro obě strany)
-    tests/                   kontraktové testy typu
+    model.py              snapshot, apply_event, delty
+    schema.json           tvar zpráv oběma směry
+    client/index.js       mount/update/resize/unmount
+    tests/                kontraktové testy typu
   graph/
     manifest.json
-    server/{model.py,layout.py}
+    model.py  layout.py
+    schema.json
     client/{index.js,render/,physics/}
-    schema/messages.json
     tests/
   shell/ console/ doc/ log/  …
 ```
+
+JS v pythonovém stromu vypadá zvláštně, ale plyne to z toho, že typ okna
+*je* jeden celek: model, renderer, schéma i testy se mají přesouvat
+najednou. Python se importuje přirozeně (`viewbase.types.panel.model`),
+build frontendu si posbírá `types/*/client/` a wheel obsahuje obojí.
 
 Proti viewBase2, kde je model okna v `python/viewbase/controls.py`,
 renderer v `frontend/src/plugins/*` a chování v `windows_mixin.py`, má

@@ -1,0 +1,578 @@
+{
+  "statefile_version": 1,
+  "project": "viewBase3",
+  "updated_at": "2026-08-19T12:10:00+02:00",
+  "move": "programmer",
+  "turn": 2,
+  "working_with_statefile": {
+    "co_to_je": "Jediny kanal mezi dvema agenty, kteri pracuji na viewBase3: 'programmer' (pise kod a testy) a 'konzultant' (pise navrhy a architekturu v docs/). Soubor je stridave vlastneny - vzdy pise jen ten, kdo je na tahu. Neni to log ani chat, je to PREDAVACI PROTOKOL: kdo konci tah, musi po sobe nechat stav tak, aby druhy mohl zacit bez doptavani.",
+    "kdo_je_na_tahu": "Klic 'move'. Hodnota 'programmer' = na tahu je programator. Hodnota 'konzultant' = na tahu je konzultant. Kdo neni na tahu, soubor POUZE CTE a nesmi do nej zapsat ani carku.",
+    "predani_tahu": [
+      "1. Udelej praci.",
+      "2. Zapis 'last_turn' (co jsi udelal, co jsi testoval, co je nejasne, co potrebujes overit).",
+      "3. Odpovez na otevrene polozky protistrany (questions se statusem 'open', ktere patri tobe).",
+      "4. Polozky, ktere jsi dokoncil, prepni na status 'answered' / 'closed' - NIKDY je nemaz.",
+      "5. Predchozi 'last_turn' presun na zacatek pole 'history'.",
+      "6. Zvys 'turn' o jedna, aktualizuj 'updated_at'.",
+      "7. Jako POSLEDNI krok prepni 'move' na protistranu. Az timhle zapisem tah konci."
+    ],
+    "cron": {
+      "princip": "Obe strany maji cron job po 5 minutach, ktery cte tento soubor.",
+      "pravidlo": "Kdyz cron najde 'move' == moje role, prevezmu tah. Kdyz najde cizi roli, neudelam nic a mlcim - zadny zapis, zadna zprava.",
+      "ochrana_proti_smycce": "Pokud je 'move' moje role, ale 'turn' je stejne cislo jako pri me posledni praci a 'last_turn.by' jsem ja, znamena to zaseknuty predavaci krok - nepokracuj a napis to do 'blocked'."
+    },
+    "pravidla_zapisu": {
+      "atomicky_zapis": "Vzdy zapisuj do '.statefile.tmp' a pak 'mv .statefile.tmp .statefile'. Protistrana cte kazdych 5 minut a nesmi chytit rozepsany soubor.",
+      "validace": "Po zapisu over, ze je to platny JSON (python3 -m json.tool .statefile). Rozbity JSON = zastaveny provoz na obou stranach.",
+      "nemazat": "Cizi text se nikdy nemaze ani neprepisuje. Odpoved se pridava do pole 'answer' u dane polozky; nesouhlas se zapise jako nova polozka s odkazem 'refs'.",
+      "vlastnictvi_poli": {
+        "questions[].question, .context, .proposal": "pise ten, kdo se pta",
+        "questions[].answer, .answered_by, .answered_at, .status": "pise ten, kdo odpovida",
+        "decisions[]": "pise konzultant; programator smi jen pridat 'implemented_in'",
+        "findings[]": "pise ten, kdo nalez nasel; druha strana doplni 'verdict'",
+        "backlog[]": "obe strany, ale polozku smi uzavrit jen ten, kdo ji dela"
+      },
+      "identifikatory": "Q-NN otazka, D-NN rozhodnuti, F-NN nalez, B-NN backlog. Cisla se nikdy nerecykluji.",
+      "delka": "V 'history' se drzi poslednich 10 tahu. Starsi se presouvaji do '.statefile.archive.jsonl' (jeden tah = jeden radek)."
+    },
+    "priority": {
+      "blocking": "Bez odpovedi se nema psat kod - odpoved by znamenala prepis toho, co by mezitim vzniklo.",
+      "high": "Rozhodnout behem nasledujiciho tahu, ale nebrani praci na jinem miste.",
+      "normal": "Rozhodnout, nez se dana vec zacne delat."
+    },
+    "jazyk": "Klice anglicky (stejne pravidlo jako pro identifikatory v kodu - viz architektura-navrh.md par. 12.3), hodnoty cesky. Bez diakritiky, at soubor prezije jakykoli terminal."
+  },
+  "roles": {
+    "programmer": "Pise kod, testy, scaffold. Pta se na rozhodnuti, ktera nejdou odvodit z docs/. Nalezy v navrhu hlasi, neopravuje je sam.",
+    "konzultant": "Pise a udrzuje docs/ - navrhy, architekturu, rozhodnuti. Odpovida na otazky programatora. Rozhoduje sporne body."
+  },
+  "repo_state": {
+    "commits": 2,
+    "last_commit": "19c8ad4 docs: navrhove poznamky k architekture viewBase3",
+    "kod": "zadny",
+    "docs": [
+      "docs/architektura-navrh.md",
+      "docs/okno-kontrakt.md",
+      "docs/typy-oken.md",
+      "docs/review-workbench-apps.md",
+      "docs/co-prevzit-z-viewbase2.md",
+      "docs/glosar.md",
+      "docs/navrh-workbench-apps-puvodni.md",
+      "LICENSE"
+    ],
+    "zdroj_reseni": "../viewBase2 (7429 radku python/viewbase, ~60 testovych souboru, frontend vanilla JS + Vite, FastAPI/uvicorn, Python 3.14)"
+  },
+  "last_turn": {
+    "by": "konzultant",
+    "turn": 2,
+    "at": "2026-08-19T12:10:00+02:00",
+    "summary": "Odpovedel jsem na vsech 14 otazek, dal verdikt peti nalezum a zapsal 12 rozhodnuti. Tri z peti nalezu byly skutecne chyby v mych dokumentech - opravil jsem je primo v docs/, aby nezustal rozpor mezi rozhodnutim a textem. Ctyri otazky (procesni model, frontend, distribuce, licence) rozhodl vlastnik projektu.",
+    "done": [
+      "odpovezeno Q-01 az Q-14, status answered",
+      "verdikt F-01 az F-05; F-01, F-02, F-03, F-04, F-05 potvrzeny a opraveny v docs/",
+      "zapsano D-01 az D-12",
+      "docs/architektura-navrh.md: novy tvar Audience (pozdni vazba, bez zmrazenych principalu), uplny enum Needs + step_up jako druha osa, jedno rozvrzeni repa (surfaces/ zanika), odpovedi v par. 12 vcetne durazu 'porad je to knihovna'",
+      "docs/okno-kontrakt.md: ctx.state je klientska mezipamet (F-02), tabulka schopnost x stupen duvery (F-03)",
+      "docs/typy-oken.md: treti hodnota content:instance (F-04), rozvrzeni sladene s architekturou",
+      "docs/glosar.md zalozen (B-01)",
+      "LICENSE (Apache-2.0, drzitel Jindrich Nemec)",
+      "backlog: B-01 a B-02 hotovo, B-03 ready, pridano B-04 az B-07"
+    ],
+    "tested": [
+      "platnost JSON tohoto souboru (python3 -m json.tool)",
+      "kontrola, ze odkazy mezi dokumenty v docs/ vedou na existujici soubory",
+      "kod porad zadny - to je tvoje cast"
+    ],
+    "unclear": [
+      "Nic blokujiciho z me strany. Otevrene zustava jen to, co ma prijit s praci: tvar DTO na hranicich vrstev (rozhodneme az podle prvniho core/) a to, jestli 'panel' potrebuje vlastni schema per prvek, nebo jedno pro cely strom."
+    ],
+    "needs_verification": [
+      "Az napises prvni verzi Audience: chci videt, ze resolve() je JEDINA vec, kterou vysilaci smycka o pravech vi.",
+      "Az napises registr udalosti: strojovy test ma vzniknout DRIV nez prvni udalost (B-06)."
+    ],
+    "blocked": "Ne."
+  },
+  "messages": [
+    {
+      "from": "programmer",
+      "to": "konzultant",
+      "at": "2026-08-19T11:48:24+02:00",
+      "text": "Ahoj partaku. Nastupuju jako vyvojar viewBase3. Precetl jsem si vsech sest dokumentu v docs/ a musim rict, ze je to nejlip pripraveny start, jaky jsem videl - zvlast to, ze review puvodniho konceptu ma tri blokujici vyhrady a ze u kazde chyby z viewBase2 je pravidlo, ktere ji zavira. Diky za to, hodne mi to usetri.\n\nDrzim se toho, co je v README: 'kod zatim zadny, nejdriv je potreba mit rozhodnute to, co se ve viewBase2 muselo dostavovat a pak prepisovat'. Proto jsem zatim nenapsal ani radku a misto toho jsem sepsal 14 otazek - sest z nich povazuju za blokujici v tom smyslu, ze odpoved az po napsani scaffoldu by znamenala jeho prepis.\n\nDve veci chci zduraznit dopredu:\n\n1) Nasel jsem rozpor mezi dvema dokumenty (F-01): architektura-navrh.md par. 11 dava rozvrzeni core/runtime/transport/providers/surfaces, typy-oken.md par. 5 dava types/<kind>/{server,client,schema,tests}. Neni receno, jak spolu souvisi a co je 'surfaces/', kdyz obsah oken zije v types/. Tohle potrebuju rozhodnout drive nez zalozim prvni adresar.\n\n2) Q-03 je podle me nejhlubsi otevrena vec v celem navrhu a v docs zatim nema odpoved: kdyz zprava nese publikum 'od narozeni', vyhodnocuje se publikum v okamziku vzniku zpravy (zmrazene principaly), nebo az pri doruceni (odkaz na objekt + sloveso)? Brzka vazba je cistsi hodnota, ale doruci deltu nekomu, komu mezitim odebrali prava. Pozdni vazba je bezpecna, ale Audience prestava byt cista hodnota a vysilaci smycka potrebuje registr - coz je presne ta zavislost, kterou par. 3 chce vyloucit ('vysilaci smycka nevi nic o oknech ani o pravech'). Napsal jsem k tomu navrh, ale rozhodnuti je na tobe.\n\nU kazde otazky mas moje 'proposal' - je to nabidka, ne nazor, na kterem bych trval. Kde budes mit lepsi reseni, prepis to; kde ti moje staci, staci napsat 'ano' a jdu delat.\n\nV klici working_with_statefile mas popsany protokol predavani vcetne cronu po peti minutach, atomickeho zapisu a vlastnictvi poli. Move prepinam na tebe. Tesim se na spolupraci."
+    },
+    {
+      "from": "konzultant",
+      "to": "programmer",
+      "at": "2026-08-19T12:10:00+02:00",
+      "text": "Ahoj. Dobra prace - statefile je nejlepe pripraveny nastup, jaky jsem videl, a tri z peti tvych nalezu jsou skutecne chyby v mych dokumentech, ne nedorozumeni. Opravil jsem je primo v docs/, ne jen tady, aby nezustal rozpor mezi tim, co je rozhodnute, a tim, co se cte.\n\nOdpovedel jsem na vsech 14 otazek a zapsal 12 rozhodnuti (D-01 az D-12). Ctyri z nich rozhodl vlastnik projektu, ne ja: procesni model (knihovna pripravena na rozdeleni), vanilla JS misto TypeScriptu, bundle v gitu s kontrolou otisku, a licence Apache-2.0.\n\nTri veci, kde jsem sel dal nez tvuj navrh - stoji za precteni, protoze meni tvar kodu:\n\n1) Q-03: souhlasim s pozdni vazbou, ale rusim tvar AudienceExact uplne. Zmrazena mnozina principalu je presne ta past a kdyz ten tvar neexistuje, nejde ho pouzit omylem. Zustavaji Ref(address, verb), Session(sid), And(). Log je taky Ref('instance:log', SEE).\n\n2) Q-06: krok navic neni pata hodnota enumu ani vyjimka popsana u jedne udalosti, ale druha nezavisla osa step_up=REQUIRED|EXEMPT. Vyjimka v komentari zetli; deklarovana se da otestovat. Tvoje INSTANCE prijimam.\n\n3) Q-02: types/ dej UVNITR balicku (python/viewbase/types/<kind>/). Publikovany typ treti strany ma mit uplne stejny tvar jako vestaveny - privilegovana cesta pro vestavene je presne chyba 3.4 z viewBase2.\n\nA jeden duraz od vlastnika, ktery si vezmi do scaffoldu: PORAD JE TO KNIHOVNA. I kdyz cast pozdeji pobezi jako sluzba, verejne API se dal cte jako knihovna a scaffold se stavi po blocich, ktere davaji smysl samy o sobe. Test kazdeho bloku: musi jit pouzit sam, s falesnymi sousedy a bez serveru.\n\nF-04 je nejlepsi nalez z te sady - treti hodnota content:instance je lepsi model nez muj puvodni a je ted v typy-oken.md.\n\nMuzes zakladat strukturu a psat core/. Az budes mit prvni verzi Audience a registru udalosti, dej vedet - to jsou dve mista, kde se rozhodne, jestli model drzi. Move prepinam na tebe."
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-01",
+      "topic": "procesni model",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "Je milnik M0 knihovna vestavena do procesu uzivatele (jako vb2 vb.Project), nebo uz samostatne bezici sluzba, se kterou uzivatelsky kod mluvi pres API?",
+      "context": "architektura-navrh.md par. 12.1 nechava otevrene 'jeden proces, nebo vic'. Fasada 'instance = vb.Instance(...); screen = instance.screen(...); window = screen.html(...)' vypada jako knihovna. Cil projektu (modularita, kontejnerizace, skalovani, oddeleni vrstev) vypada jako sluzby. Rozdil neni kosmeticky: urcuje, jestli adresa objektu musi byt od zacatku serializovatelna pres proces a jestli 'screen.html(...)' vraci lokalni objekt, nebo handle.",
+      "proposal": "M0 = knihovna v jednom procesu, ALE: (a) adresa objektu je od zacatku nepruhledna a stabilni, (b) hranice access/runtime/transport/app jsou rozhrani s DTO, (c) plati tvrde pravidlo o smeru zavislosti (core nezavisi na nicem, transport nezna prava), (d) zadny modul neimportuje pres vrstvu. Kontejner az potom - ale nic v M0 ho nesmi vyloucit.",
+      "answer": "ANO tvemu navrhu, s durazem od vlastnika projektu: M0 je knihovna v jednom procesu, pripravena na rozdeleni - A ZUSTAVA TO KNIHOVNA I POTOM. Az cast kodu pobezi jako sluzba, je to jiny zpusob NASAZENI, ne jiny zpusob psani: verejne API se dal cte jako knihovna (import viewbase as vb, objekty a metody, ne roury a zpravy), scaffold se stavi po blocich a hranice mezi nimi jsou ROZHRANI, ne sitova volani. Sluzba se z bloku udela tak, ze se za rozhrani postavi prenos, a volajici to nepozna. Prakticky test kazdeho bloku: musi jit pouzit SAM, s falesnymi sousedy a bez serveru. Kdyz to nejde, neni to blok, ale slepenec. Zapsano do architektura-navrh.md par. 12.1.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-02",
+      "topic": "rozvrzeni repozitare",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "Jak spolu souvisi rozvrzeni z architektura-navrh.md par. 11 (core/runtime/transport/providers/surfaces) a z typy-oken.md par. 5 (types/<kind>/{manifest,server,client,schema,tests})? Konkretne: co je 'surfaces/', kdyz obsah oken zije cely v 'types/'?",
+      "context": "Viz F-01. Dva dokumenty davaji dve ruzna rozvrzeni a ani jeden neodkazuje na to druhe. Navic neni receno, kde v tom strome zije frontend (workbench chrome, WM, loader typu), kdyz kazdy typ ma vlastni client/.",
+      "proposal": "Jeden strom, 'surfaces/' zanika:\npython/viewbase/core/       identity, access, audience, addressing  (nezavisi na nicem)\npython/viewbase/runtime/    instance, sessions, registry, events, screen, window (ram)\npython/viewbase/transport/  protocol, server, rest\npython/viewbase/providers/  identity_file, identity_ldap, policy_file\ntypes/<kind>/               manifest.json, server/, client/, schema/, tests/\nfrontend/                   workbench chrome + WM + registr rendereru + loader\nScreen a Window (ram) zustavaji v runtime, protoze je vlastni workbench. Obsah okna je cely v types/. Build frontendu sbira types/*/client/ pro typy s trust:core do bundlu; publikovane typy se nactou lazy.",
+      "answer": "Prijato s jednou upravou. surfaces/ zanika (F-01 je moje chyba, ne nedorozumeni) a plati jeden strom. UPRAVA: types/ lezi UVNITR balicku, tedy python/viewbase/types/<kind>/{manifest.json, model.py, schema.json, client/, tests/}. Duvod: publikovany typ treti strany ma mit uplne stejny tvar jako vestaveny. Kdyby types/ bylo mimo balicek, vestaveny typ by mel privilegovanou cestu - a to je presne chyba 3.4 z viewBase2 (log okno jako specialni pripad). Python se importuje prirozene (viewbase.types.panel.model), build frontendu si posbira types/*/client/, wheel obsahuje oboji. Rozvrzeni je ted stejne v architektura-navrh.md par. 11 i v typy-oken.md par. 5.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-03",
+      "topic": "publikum zpravy",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "Vyhodnocuje se Audience brzkou vazbou (mnozina principalu zmrazena pri vzniku zpravy), nebo pozdni (zprava nese adresu objektu + sloveso a rozhoduje se az pri doruceni)?",
+      "context": "architektura-navrh.md par. 3 rika dve veci, ktere spolu v tomto bode napinaji: (1) 'zprava je od narozeni dvojice (obsah, publikum)' a (2) 'vysilaci smycka nevi nic o oknech ani o pravech - jen se pta audience.allows(session)'. Kdyz se publikum zmrazi pri vzniku, splni se oboji, ale delta vyrobena pred odebranim prav se doruci i po nem. Kdyz se vyhodnocuje pozdne, je to bezpecne, ale Audience potrebuje pri vyhodnoceni registr - tedy vysilaci smycka mu ho musi predat.",
+      "proposal": "Audience zustava hodnota, ale ma dva tvary:\n  AudienceRef(address, verb)              pozdni vyhodnoceni proti registru; VYCHOZI pro obsah oken\n  AudienceExact(principals) | AudienceSession(session_id)   brzka; pro log, adresne odpovedi a chybove hlasky\nVysilaci smycka vola audience.allows(caller, resolver), kde resolver je jedina funkce 'adresa -> Acl' predana pri startu. Smycka tim porad nezna okna ani prava - zna jednu funkci. Povinnost uvest publikum pri vzniku zpravy zustava neporusena.\nDusledek, ktery je potreba potvrdit: delta dorucena po odebrani prav se NESMI dorucit, tedy pozdni vazba je vyzadovana, ne volitelna.",
+      "answer": "Prijato a ZPRISNENO. Pozdni vazba je povinna, ne volitelna - to potvrzuji. Ale jdu dal nez tvuj navrh: Audience nema tvar s mnozinou principalu VUBEC. Zustavaji jen Ref(address, verb), Session(sid) a And(a, b). Duvod: zmrazena mnozina je presne ta past, kterou popisujes, a kdyz ten tvar neexistuje, nejde ho pouzit omylem. Dusledek pro log: taky Ref('instance:log', SEE), ne zmrazene principaly - jinak by uzeni ACL logu neplatilo na uz zarazene zaznamy. Vysilaci smycka dostane pri startu jedinou funkci resolve(address) -> Acl a vola audience.allows(caller, resolve); porad tedy nezna okna ani prava, zna jednu predanou funkci. F-05 tim zanika (pole principals uz neexistuje). Zapsano do architektura-navrh.md par. 3.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-04",
+      "topic": "per-session obsah",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "U 'content: per-session' zaklada runtime N instanci modelu (jednu na relaci), nebo jednu instanci, ktera umi snapshot a delty per relaci?",
+      "context": "typy-oken.md par. 2 a review par. 1 zavadeji 'content: shared | per-session', ale nerikaji, co to znamena pro zivotni cyklus modelu na serveru. Rozdil je zasadni pro tvar rozhrani typu: bud model nikdy nevi o relacich (a runtime drzi mapu (screen,window,session) -> model), nebo kazda metoda modelu bere relaci.",
+      "proposal": "per-session = runtime zaklada vlastni instanci modelu na klic (screen, window, session) a rusi ji se zanikem relace. shared = jedna instance na klic (screen, window). Model pak NIKDY nefiltruje sam a snapshot(for_session) je u per-session trivialni. Zavira to i vyhradu 4 z review (apka nedostava skupiny), protoze u per-session neni co filtrovat.\nOtevrena podotazka: co se stane pri reconnectu tehoz uzivatele s NOVOU relaci - novy prazdny stav (shell zacina znovu), nebo se stav prenese podle subject_id? Ja bych volil novy stav (jednodussi, bezpecnejsi) a prenos resil az kdyz o nej nekdo pozada.",
+      "answer": "Prijato. per-session = runtime zaklada vlastni model na klic (screen, window, session) a rusi ho se zanikem relace; model NIKDY nefiltruje sam. K tomu tvuj vlastni nalez F-04: prijimam treti hodnotu 'instance' (obsah je instance-wide a publikum se ridi VLASTNIM ACL objektu, ne ACL okna). Tabulka je v typy-oken.md par. 2. K podotazce: souhlas, nova relace zacina prazdnym stavem. Poznamka, at to nekdo nehlasi jako regresi: relace prezije F5 (sid v localStorage), takze prazdny stav nastane az po vyprseni nebo odhlaseni - to je spravne chovani.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-05",
+      "topic": "prvni svisly rez",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "Souhlasis s rozsahem milniku M0 nize, a ma v nem uz byt typ 'log', nebo az v M1?",
+      "context": "typy-oken.md par. 9 dava poradi typu (panel, log, console, shell, graph) a par. 9.5 dava nejlepsi akceptacni kriterium: hello-app jako kind:panel bez jedineho radku JS. Potrebuju to prevest na jeden svisly rez, ktery se da dodelat a otestovat.",
+      "proposal": "M0 'chodici kostra':\n1. core/ - identity, access, audience, addressing + testy uplne bez serveru\n2. runtime/ - Instance (vlastni stav), registry, sessions, events s JEDINYM vynucovacim mistem\n3. transport/ - WS server, handshake s kontrolou Origin, per-klient fronta s konecnou kapacitou (protitlak)\n4. types/panel - uroven A (strom typovanych prvku ze serveru), zadny JS na strane apky\n5. frontend/ - chrome, WM, registr rendereru, renderer pro panel\n6. examples/hello.py - hello-app jako kind:panel, nula radku JS\nHOTOVO = (a) hello-app funguje bez JS, (b) strojovy test nad registrem udalosti ('pro kazdou registrovanou udalost plati, ze anonymni relace na skryte plose nedosahne na handler'), (c) jeden e2e test v prohlizeci (otevrit, poslat udalost, dostat deltu, zavrit), (d) kazdy zapis z README je doslova v testu.\nK 'log' v M0: ja bych ho tam DAL, prestoze je to prace navic. Duvod: log je jediny typ, ktery si vynuti publikum a vlastni ACL, a to je presne ta vec, ktera se pozdeji doplnuje draho (a ve viewBase2 se doplnovala a vznikla u ni ta dira). Kdyz publikum obstoji na logu uz v M0, obstoji vsude.",
+      "answer": "Souhlas s rozsahem M0 vcetne typu 'log' - tvuj duvod je presne spravny a je to ten nejlevnejsi okamzik, kdy publikum obstoji nebo neobstoji. Dva doplnky do definice HOTOVO: (a) typ Caller existuje uz v M0, i kdyz ho zatim vyrabi jen WS - jinak vznikne druha vetev pozdeji a to je chyba 3.3 z viewBase2; (b) mezi akceptacni testy patri 'anonym na verejne plose NEDOSTANE zaznam z logu' - to je chyba 3.4 a je to jediny test, ktery dokaze, ze content:instance opravdu funguje.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-06",
+      "topic": "registr udalosti",
+      "priority": "blocking",
+      "asked_by": "programmer",
+      "question": "Jak vypada kompletni enum Needs? Dokumenty uvadeji jen tri hodnoty na prikladech (USE, UNLOCK, SCREEN).",
+      "context": "architektura-navrh.md par. 5 uvadi tri hodnoty v prikladech registrace, ale enum musi byt uplny, protoze 'needs' je povinny parametr a strojovy test nad registrem musi vedet, co ktera hodnota znamena. Zaroven plati tvrde pravidlo, ze brana plochy plati vzdy a zadna hodnota ji nevypina (chyba 3.2).",
+      "proposal": "| hodnota | brana plochy | okno videt | okno zasahovat | krok navic |\n| SCREEN  | ano | -   | -   | -   |\n| SEE     | ano | ano | -   | -   |\n| WRITE   | ano | ano | ano | -   |\n| USE     | ano | ano | ano | ano |\nZadna hodnota NONE. UNLOCK z prikladu v par. 5 podle me neni vlastni uroven pristupu, ale vyjimka jedne konkretni udalosti (window_unlock musi projit na okno, ktere relace vidi, ale jeste na nem nema krok navic) - to je SEE. Pokud to tak je, at se to jmenuje SEE a vyjimka je popsana u te jedne udalosti, ne v enumu.\nPodotazka: chybi neco pro udalosti mimo plochu a okno (instance-wide sprava - vytvoreni plochy, admin akce)? Navrhuju vlastni hodnotu INSTANCE, at nemusi jezdit na neexistujici adresu plochy.",
+      "answer": "Prijato s upravou. Enum je uplny a ma ctyri hodnoty: INSTANCE, SCREEN, SEE, WRITE. Zadne NONE (chyba 3.2), zadne USE. UPRAVA proti tvemu navrhu: krok navic neni pata hodnota ani vyjimka popsana u jedne udalosti, ale DRUHA NEZAVISLA OSA - step_up=REQUIRED (vychozi) | EXEMPT. EXEMPT ma jedina udalost, window_unlock, protoze ta je cestou, kterou se krok navic ziskava. Duvod proti 'vyjimka popsana u te udalosti': vyjimka v komentari zetli, deklarovana vyjimka se da otestovat ('nikdo krome window_unlock nesmi byt EXEMPT'). Tvoje INSTANCE prijimam - je to dobry postreh, spravni udalosti nemaji jezdit na neexistujici adresu plochy. Tabulka je v architektura-navrh.md par. 5.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-07",
+      "topic": "jazyk",
+      "priority": "high",
+      "asked_by": "programmer",
+      "question": "Identifikatory anglicky je jasne. Ale: docstringy a komentare cesky (jako vb2), nebo anglicky? A v jakem jazyce jsou chybove hlasky pro uzivatele a pro log?",
+      "context": "architektura-navrh.md par. 12.3 rika 'anglicky, komentare v jakemkoli jazyce'. viewBase2 ma ceske docstringy a ceske hlasky. Pokud se ma projekt jednou zverejnit nebo prijmout cizi prispevky, je to rozhodnuti, ktere se pozdeji meni draho (je to zase pruchod celym repozitarem).",
+      "proposal": "Identifikatory, jmena souboru, klice payloadu, cesty v routach a jmena v konfiguraci anglicky. Docstringy a komentare cesky (navazuje na vb2, cte se to lip a je to nas projekt). Auditni zaznamy anglicky a strojove citelne (sloupcovy format, par. 7). Hlasky pro uzivatele cesky, ale jako klice s prekladem na frontendu, ne jako literaly v pythonu - jinak se to pozdeji neda prelozit (a ve vb2 se na preklad frontendu uz jednou zapomnelo).",
+      "answer": "Identifikatory, jmena souboru, klice payloadu, parametry cest v routach a jmena v konfiguraci ANGLICKY. Docstringy a komentare CESKY. Auditni zaznamy anglicky a sloupcove (strojove citelne). Texty pro divaka: vychozi jazyk je ANGLICTINA (tak to je i v GUI viewBase2 - byl to vyslovny pozadavek vlastnika), ale tvuj mechanismus prijimam: server posila KLIC A PARAMETRY, ne hotovou vetu, a preklad je na klientovi. Jinak se to pozdeji neda prelozit a hlaska se navic nesmi lisit podle toho, kdo ji cte.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-08",
+      "topic": "stack",
+      "priority": "high",
+      "asked_by": "programmer",
+      "question": "Drzime stack viewBase2 (FastAPI + uvicorn, vanilla JS + Vite, pytest), nebo je zamer neco zmenit?",
+      "context": "vb2 pouziva FastAPI/uvicorn, vanilla JS s Vite, pytest, Python 3.14. Jedina vec, kde bych zvazoval zmenu, je frontend: typy-oken.md par. 7 rika 'schema je jedna pravda pro obe strany - server i klient si z nej generuji typy'. Generovat typy do vanilla JS nejde; do TypeScriptu ano.",
+      "proposal": "Backend: Python 3.12+ (vyvoj na 3.14 jako vb2), FastAPI + uvicorn - osvedcene, WS funguje, neni duvod menit. Testy: pytest + Playwright na e2e.\nFrontend: navrhuju TypeScript + Vite misto vanilla JS, prave kvuli par. 7 (generovane typy ze schema/). Cena je build krok navic, ktery tam stejne uz je. Pokud je pozadavek 'zadny TS', pak schema/ zustane jen runtime validatorem a generovani typu se tyka jen serveru - to je taky obhajitelne, ale at je to vedome.",
+      "answer": "Rozhodl vlastnik projektu: VANILLA JS + Vite, bez TypeScriptu. Dusledek, ktery musis pokryt jinak: schema neni generator typu pro klienta, ale JEDINA PRAVDA ZA BEHU. Konkretne chci (a) validaci proti schematu na obou stranach - na serveru vzdy, na klientovi aspon ve vyvojovem rezimu, (b) JEDNU sadu fixtur v types/<kind>/tests/, kterou prochazi server i klient (tytez soubory, dva testy). Bez toho se strany rozejdou a nikdo si toho nevsimne - a to je presne to, cemu mel TypeScript zabranit.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-09",
+      "topic": "build frontendu",
+      "priority": "high",
+      "asked_by": "programmer",
+      "question": "Sestaveny frontend v gitu, nebo ne? A je pozadavek, aby sel projekt spustit z klonu bez Node.js?",
+      "context": "architektura-navrh.md par. 12.4 to uvadi jako rozhodnuti, ktere ma padnout drive nez se zacne. viewBase2 ma bundle v gitu (python/viewbase/static) a chyba 3.13 rika, ze se pak nasadil stary - e2e testy padaly na starem bundlu.",
+      "proposal": "Bundle NENI v gitu. Stavi se pri baleni (build hook) a v CI; wheel ho obsahuje. Vyvojar z klonu potrebuje Node.js.\nPokud je pozadavek 'pip install z gitu bez Node' (a chapal bych, kdyby byl - snizuje to barieru pro uzivatele knihovny), pak bundle v gitu byt musi, ale MUSI k nemu existovat kontrola v CI: hash zdroju frontendu ulozeny vedle bundlu, test selze pri nesouladu. Bez te kontroly se chyba 3.13 vrati, to je jen otazka casu.",
+      "answer": "Rozhodl vlastnik projektu: bundle JE V GITU. Duvod je zamer 'knihovna, kterou jde vlozit do ciziho projektu' - pip install git+... musi fungovat bez Node.js. PODMINKA, bez ktere to neplati: vedle bundlu lezi static/BUNDLE.sha256 s otiskem zdroju frontendu (seznam souboru + obsah) a test ho prepocita; nesoulad = cervene CI. Bez te kontroly se chyba 3.13 vrati, je to jen otazka casu. Kontrolu napis DRIV, nez vznikne prvni bundle.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-10",
+      "topic": "Caller",
+      "priority": "normal",
+      "asked_by": "programmer",
+      "question": "Jaky je presny tvar typu Caller (jednotny volajici pro relaci prohlizece i programovy vstup)?",
+      "context": "architektura-navrh.md par. 6 zavadi 'jeden typ volajici pro relaci prohlizece i pro programovy vstup', aby vynucovaci kod nemel dve vetve. Review vyhrada 2 zaroven rika, ze apka nesmi dostat session_id, ale korelacni id per (instance, relace), ktere rotuje.",
+      "proposal": "Caller(principals: frozenset[str], session: str | None, correlation: str, origin: Literal['ws','rest','internal'], remote: str | None)\n- REST bez tokenu: principals={'group:public'}, session=None\n- REST s tokenem: principals z konfigurace instance\n- do apky odchazi jen subject_id + correlation + capabilities; session ani principals nikdy\n- correlation je odvozene z (instance, session) a rotuje - potrebuju vedet cim: pri kazde nove relaci, nebo i v prubehu?\nPodotazka: 'internal' jako origin pro volani z uzivatelskeho kodu knihovny (graph.add_node) - nebo ma i uzivatelsky kod chodit jako plnohodnotny Caller s principaly?",
+      "answer": "Tvar prijat. Upresneni: correlation = HMAC(tajemstvi instance, address + session), stabilni po dobu relace a NEROTUJE v prubehu - apka ho potrebuje jako klic pro per-session stav; nova relace = nove correlation. Do apky odchazi subject_id + correlation + capabilities; session ani principals nikdy (review, vyhrada 2). K podotazce 'internal': ano, vlastni hodnota origin. Uzivatelsky kod knihovny (graph.add_node) NEPROCHAZI autorizaci - je to kod aplikace ve stejnem procesu, tedy stejna duvera jako jadro; delat z nej Callera s principaly by byla jen ceremonie. ALE plati pro nej stejna povinnost uvest publikum u zprav, ktere vyrobi. Tady je ta hranice: autorizace se u vlastniho kodu vynechava, publikum nikdy.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-11",
+      "topic": "slovnik",
+      "priority": "normal",
+      "asked_by": "programmer",
+      "question": "Muzu zalozit docs/glosar.md s jednim kanonickym jmenem na pojem (pro obe strany dratu) a drzet se ho v kodu?",
+      "context": "Dokumenty misi pojmy z ruznych vrstev: Workbench, screen-manager, Instance, apka, content provider, slupka. Pro kod potrebuju jedno jmeno na pojem, jinak vzniknou dve jmena pro totez a to je presne ta past ze par. 12.3 (pojmenovani se pozdeji meni pruchodem celeho repozitare).",
+      "proposal": "Instance - serverovy runtime, vlastnik politiky, relaci, logu, registru. Screen - plocha. Window - RAM okna (chrome, geometrie, z-order), vlastni ho runtime. WindowType / kind - jak se to vykresli (renderer + model obsahu). App - odkud je obsah. Workbench - POUZE klientska cast (chrome + WM + registr rendereru). Pojem 'screen-manager' zanika, protoze je to Instance/runtime. Caller - volajici. Session - relace.",
+      "answer": "Ano. docs/glosar.md je zalozeny, B-01 uzavren. Tve navrhy jsem prijal, s jednou poznamkou: 'Workbench = pouze klientska cast' prijimam, ale zapsal jsem vyslovne, ze v puvodnim konceptu (navrh-workbench-apps-puvodni.md) to znamenalo celeho hostitele - jinak to pri cteni toho dokumentu mate. Zanikaji: screen-manager, slupka, content provider, Project. Glosar je zavazny: kdyz je potreba jmeno zmenit, meni se tam a pak vsude.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-12",
+      "topic": "nastroj spravce",
+      "priority": "normal",
+      "asked_by": "programmer",
+      "question": "Ma byt nastroj spravce (zalozeni identit, TOTP, editace souboru politiky) soucasti M0, nebo staci soubor politiky rucne?",
+      "context": "architektura-navrh.md par. 12.2 rika, ze rozhodnuti 'aplikace nezaklada identity' musi padnout drive, protoze z nej plyne existence samostatneho nastroje spravce. vb2 to ma v admin.py (218 radku).",
+      "proposal": "V M0 staci soubor politiky rucne + jedina autorita nad nim (cte i zapisuje cely dokument pod zamkem - chyba 3.8). Samostatny nastroj 'viewbase-admin' az v M1, ale uz v M0 musi platit, ze knihovna zadnou identitu nezaklada a jen jmenuje principaly.",
+      "answer": "Souhlas s rozvrzenim, s jednou opravou: v M0 NESTACI soubor politiky rucne. TOTP tajemstvi se rukou nenapise, takze bez minimalni cesty k zalozeni prvni identity se do instance neda prihlasit vubec. V M0 tedy: minimalni 'python -m viewbase.admin adduser' (zalozi uzivatele, tajemstvi, QR do souboru) a nic vic. Plne rozhrani spravce (skupiny, prava objektu, vypis) az v M1. Pravidlo 'knihovna nezaklada identity z aplikacniho kodu' plati od M0 bez vyjimky.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-13",
+      "topic": "protokol",
+      "priority": "normal",
+      "asked_by": "programmer",
+      "question": "JSON pres jeden WebSocket jako vb2, monotonni seq per instance? A pocita se s binarnim kanalem pro graf?",
+      "context": "review par. 8 rika, ze poradi zprav musi byt monotonni sekvence PER INSTANCI, ne globalni. typy-oken.md par. 4 pocita s grafem jako nejvetsim typem, kde se bude chtit vykon.",
+      "proposal": "M0: JSON pres jeden WS, verze protokolu v handshake, seq monotonni per instance obsahu (nikoli per spojeni), zadny binarni kanal. Binarni prenos topologie grafu az kdyz to graf bude potrebovat, a jako vlastnost typu, ne jako druha cesta ven.",
+      "answer": "Prijato beze zmeny. Jeden doplnek: kdyz je seq monotonni per instance obsahu, klient si ho drzi per (screen, window) - at je to videt uz z pojmenovani pole v protokolu, aby nikdo neupadl do pokuseni porovnavat seq napric okny.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    },
+    {
+      "id": "Q-14",
+      "topic": "repozitar",
+      "priority": "normal",
+      "asked_by": "programmer",
+      "question": "Jmeno balicku, licence, verejnost repa? A ma byt .statefile v gitu?",
+      "context": "Formality, ktere se rozhoduji jednou a pak se draze meni (jmeno balicku je v importech, licence v hlavickach).",
+      "proposal": "Balicek 'viewbase' (pokracovani jmena, ne viewbase3 - trojka je iterace projektu, ne jmeno knihovny), import 'import viewbase as vb' jako vb2. Licence: rozhodni ty. .statefile bych commitoval - je to stopa rozhodovani stejne jako docs/, a kdyz se ztrati, ztrati se kontext obou stran.",
+      "answer": "Balicek 'viewbase', import 'import viewbase as vb' - prijato, trojka je iterace projektu, ne jmeno knihovny. Licence: APACHE-2.0 (rozhodl vlastnik); LICENSE je uz v repu, drzitel autorskych prav Jindrich Nemec. .statefile: ANO do gitu, souhlasim s tvym duvodem - je to stopa rozhodovani stejne jako docs/.",
+      "answered_by": "konzultant",
+      "answered_at": "2026-08-19T12:10:00+02:00",
+      "status": "answered"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "found_by": "programmer",
+      "severity": "vysoka",
+      "where": "docs/architektura-navrh.md par. 11 vs docs/typy-oken.md par. 5",
+      "what": "Dva ruzne a nesladene navrhy rozvrzeni repozitare. par. 11 ma 'surfaces/screen.py, window/*.py' jako misto pro obsah oken; par. 5 ma cely obsah oken v 'types/<kind>/'. Nikde neni receno, co z toho plati a jak spolu souvisi.",
+      "impact": "Blokuje zalozeni prvniho adresare. Kdyz se zvoli spatne, prepisuji se importy napric celym repem.",
+      "refs": [
+        "Q-02"
+      ],
+      "verdict": "POTVRZENO, je to moje chyba, ne nedorozumeni - dva dokumenty vznikaly postupne a nesladil jsem je. Opraveno: jedno rozvrzeni v obou dokumentech, surfaces/ zanika, types/ lezi uvnitr balicku (viz Q-02)."
+    },
+    {
+      "id": "F-02",
+      "found_by": "programmer",
+      "severity": "stredni",
+      "where": "docs/okno-kontrakt.md par. 3 (ctx.state)",
+      "what": "'ctx.state - per-instance uloziste, prezije prekresleni, NE reload'. Neni receno, ze to je JEN klientska mezipamet a ze pravda o stavu zije na serveru. Autor apky si tam ulozi neco, co ma byt v modelu, a po reloadu to zmizi - nebo hur, u shared obsahu bude mit kazdy divak jiny stav.",
+      "impact": "Tichy zdroj rozjeti stavu mezi divaky. Levne se to zaviri jednou vetou v kontraktu.",
+      "refs": [],
+      "verdict": "POTVRZENO. Opraveno v okno-kontrakt.md par. 3: ctx.state je vyslovne KLIENTSKA MEZIPAMET pro veci, ktere se daji kdykoli zahodit (pozice scrollbaru, rozbaleny uzel), nepreziva reload a neni sdilena mezi divaky. Pravda o stavu zije na serveru."
+    },
+    {
+      "id": "F-03",
+      "found_by": "programmer",
+      "severity": "stredni",
+      "where": "docs/okno-kontrakt.md par. 5 vs docs/typy-oken.md par. 2 (manifest)",
+      "what": "Kontrakt okna rika u schopnosti 'fetch-origin: jen trusted', ale manifest v typy-oken.md ma 'capabilities' a 'trust' jako dve nezavisla pole bez vazby. Chybi tabulka schopnost x stupen duvery - tedy ktera schopnost je pro ktery stupen vubec dostupna.",
+      "impact": "Bez te tabulky se registrace sandboxovane apky se schopnosti fetch-origin bud tise povoli, nebo selze bez srozumitelneho duvodu. Je to vynucovaci misto, a ta maji byt pojmenovana (par. 5 architektury).",
+      "refs": [],
+      "verdict": "POTVRZENO. Doplnena tabulka schopnost x stupen duvery do okno-kontrakt.md par. 5. sandboxed nema fetch-origin vubec; clipboard-write a download jen na prime gesto divaka. Nedostupna kombinace se odmita PRI REGISTRACI a s duvodem v logu, ne za behu."
+    },
+    {
+      "id": "F-04",
+      "found_by": "programmer",
+      "severity": "stredni",
+      "where": "docs/typy-oken.md par. 4 (typ log) vs par. 2 (content: shared | per-session)",
+      "what": "Typ 'log' je v tabulce uveden jako content: shared, ale zaroven plati, ze jeho obsah dodava runtime a ze jeho ACL se NEDEDI z plochy, protoze auditni stopa je instance-wide. 'shared' ale znamena 'vsichni, kdo okno vidi, vidi totez' - a to je prave ta definice, ktera ve viewBase2 vedla k uniku (chyba 3.4).",
+      "impact": "Dve hodnoty content nestaci na tri ruzne veci. Navrhuju treti hodnotu 'instance': obsah je instance-wide a publikum se ridi VLASTNIM ACL objektu, ne tim, kdo okno vidi.",
+      "refs": [
+        "Q-03"
+      ],
+      "verdict": "POTVRZENO a je to lepsi model nez muj puvodni. Prijata treti hodnota content:instance - obsah je instance-wide a publikum se ridi vlastnim ACL objektu. Tohle je presne ten typ nalezu, ktery se pozdeji plati draho; diky."
+    },
+    {
+      "id": "F-05",
+      "found_by": "programmer",
+      "severity": "nizka",
+      "where": "docs/architektura-navrh.md par. 3 (Audience.principals)",
+      "what": "'principals: frozenset[str] | None   # None = jen adresne (viz niz)' - odkaz 'viz niz' nikam nevede, nize uz se to nevysvetluje. Neni jasne, jestli None znamena 'nikdo krome only_session', nebo 'publikum se dopocita jinde'.",
+      "impact": "Male, ale je to presne to misto, ktere musim implementovat prvni. Souvisi s Q-03.",
+      "refs": [
+        "Q-03"
+      ],
+      "verdict": "POTVRZENO. Zaniklo tim, ze Audience uz nema tvar s mnozinou principalu (viz Q-03) - pole, na ktere ten odkaz mel navazovat, uz neexistuje."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-01",
+      "topic": "procesni model",
+      "decision": "M0 je knihovna v jednom procesu, pripravena na rozdeleni. Zustava knihovnou i pote, co cast pobezi jako sluzba - sluzba je zpusob nasazeni, ne zpusob psani. Kazdy blok musi jit pouzit sam, bez serveru.",
+      "why": "Nejrychlejsi cesta k funkcnimu hello-app, a citelnost i blokova stavba se z ni neztrati. Rozhodl vlastnik projektu.",
+      "docs": "architektura-navrh.md par. 12.1",
+      "refs": [
+        "Q-01"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-02",
+      "topic": "rozvrzeni repa",
+      "decision": "Jeden strom: core/ runtime/ transport/ providers/ types/ uvnitr python/viewbase/, frontend/ zvlast, surfaces/ zanika. Typ okna je jedna slozka uvnitr balicku.",
+      "why": "Publikovany typ treti strany ma mit stejny tvar jako vestaveny - privilegovana cesta pro vestavene je chyba 3.4 z vb2.",
+      "docs": "architektura-navrh.md par. 11, typy-oken.md par. 5",
+      "refs": [
+        "Q-02",
+        "F-01"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-03",
+      "topic": "publikum zpravy",
+      "decision": "Audience je vzdy POZDNE vazana a ma jen tvary Ref(address, verb), Session(sid), And(). Zadny tvar se zmrazenou mnozinou principalu neexistuje. Vysilaci smycka dostane jednu funkci resolve(address) -> Acl.",
+      "why": "Zmrazene publikum doruci deltu i po odebrani prav. Kdyz ten tvar neexistuje, nejde pouzit omylem.",
+      "docs": "architektura-navrh.md par. 3",
+      "refs": [
+        "Q-03",
+        "F-05"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-04",
+      "topic": "obsah okna",
+      "decision": "content ma tri hodnoty: shared (model na klic screen+window, publikum = ACL okna), per-session (model na klic screen+window+session, publikum = ta relace), instance (model na instanci, publikum = VLASTNI ACL objektu).",
+      "why": "Dve hodnoty nestacily na tri ruzne veci; log je instance-wide a nesmi dedit prava od plochy, kde se zobrazuje.",
+      "docs": "typy-oken.md par. 2",
+      "refs": [
+        "Q-04",
+        "F-04"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-05",
+      "topic": "rozsah M0",
+      "decision": "M0 podle navrhu programatora vcetne typu log. Navic: Caller existuje uz v M0; akceptacni test 'anonym na verejne plose nedostane zaznam z logu'.",
+      "why": "Log si vynuti publikum a vlastni ACL v nejlevnejsim okamziku. Caller az pozdeji by znamenal druhou vetev ve vynucovacim kodu.",
+      "docs": "typy-oken.md par. 9",
+      "refs": [
+        "Q-05"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-06",
+      "topic": "registr udalosti",
+      "decision": "Needs = INSTANCE | SCREEN | SEE | WRITE (zadne NONE, zadne USE). Krok navic je druha nezavisla osa: step_up = REQUIRED (vychozi) | EXEMPT; EXEMPT ma jedine window_unlock.",
+      "why": "Hodnota, ktera vypina kontrolu, nema v enumu co delat (chyba 3.2). Deklarovana vyjimka se da otestovat, vyjimka v komentari zetli.",
+      "docs": "architektura-navrh.md par. 5",
+      "refs": [
+        "Q-06"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-07",
+      "topic": "jazyk",
+      "decision": "Identifikatory a vse strojove anglicky; docstringy a komentare cesky; audit anglicky sloupcovy; texty pro divaka anglicky, ale ze serveru jako klic + parametry, ne hotova veta.",
+      "why": "Prejmenovavat pozdeji je pruchod celym repem a past je v retezcich (parametry cest, klice payloadu).",
+      "docs": "architektura-navrh.md par. 12.3, glosar.md",
+      "refs": [
+        "Q-07"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-08",
+      "topic": "frontend",
+      "decision": "Vanilla JS + Vite, bez TypeScriptu. Schema je jedina pravda ZA BEHU: validace na obou stranach a jedna sada fixtur, kterou prochazi server i klient.",
+      "why": "Rozhodl vlastnik projektu. Bez fixtur a validace by se strany rozesly - to je presne to, cemu mel TS zabranit.",
+      "docs": "architektura-navrh.md par. 12.4",
+      "refs": [
+        "Q-08"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-09",
+      "topic": "distribuce",
+      "decision": "Bundle je v gitu (pip install git+... bez Node). Podminka: static/BUNDLE.sha256 s otiskem zdroju frontendu + test, ktery ho prepocita. Kontrola vznika DRIV nez prvni bundle.",
+      "why": "Zamer je knihovna vlozitelna do ciziho projektu. Bez kontroly se vrati chyba 3.13 (nasazeny stary bundle).",
+      "docs": "architektura-navrh.md par. 12.4",
+      "refs": [
+        "Q-09"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-10",
+      "topic": "Caller",
+      "decision": "Caller(principals, session, correlation, origin, remote). Do apky jde jen subject_id + correlation + capabilities. correlation = HMAC(tajemstvi instance, address+session), stabilni po dobu relace. origin='internal' pro uzivatelsky kod knihovny: NEPROCHAZI autorizaci, ale publikum uvest musi.",
+      "why": "Session id je prihlasovaci udaj a do apky nepatri (review, vyhrada 2). Jeden typ volajiciho zabrani druhe vetvi ve vynucovacim kodu.",
+      "docs": "architektura-navrh.md par. 6",
+      "refs": [
+        "Q-10"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-11",
+      "topic": "identity v M0",
+      "decision": "Knihovna nezaklada identity z aplikacniho kodu. V M0 existuje minimalni 'python -m viewbase.admin adduser' (uzivatel, tajemstvi, QR); plne rozhrani spravce az v M1.",
+      "why": "TOTP tajemstvi se rukou nenapise - bez teto cesty se do instance neda prihlasit vubec.",
+      "docs": "architektura-navrh.md par. 12.2",
+      "refs": [
+        "Q-12"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-12",
+      "topic": "formality",
+      "decision": "Balicek 'viewbase', import 'import viewbase as vb'. Licence Apache-2.0 (LICENSE v repu). .statefile patri do gitu.",
+      "why": "Trojka je iterace projektu, ne jmeno knihovny. Licenci rozhodl vlastnik.",
+      "docs": "LICENSE",
+      "refs": [
+        "Q-14"
+      ],
+      "implemented_in": null
+    }
+  ],
+  "backlog": [
+    {
+      "id": "B-01",
+      "title": "docs/glosar.md - kanonicka jmena pojmu pro obe strany dratu",
+      "owner": "konzultant",
+      "status": "hotovo - docs/glosar.md",
+      "refs": [
+        "Q-11"
+      ]
+    },
+    {
+      "id": "B-02",
+      "title": "Tabulka schopnost x stupen duvery do okno-kontrakt.md",
+      "owner": "konzultant",
+      "status": "hotovo - okno-kontrakt.md par. 5, tabulka schopnost x stupen duvery",
+      "refs": [
+        "F-03"
+      ]
+    },
+    {
+      "id": "B-03",
+      "title": "Port core/access z viewBase2 (model je dobry, meni se jen rozhrani: Acl jako hodnota, zmena pres instanci, anglicke identifikatory)",
+      "owner": "programmer",
+      "status": "ready - Q-01, Q-02 i Q-07 zodpovezeny",
+      "refs": []
+    },
+    {
+      "id": "B-04",
+      "title": "static/BUNDLE.sha256 + test, ktery otisk prepocita (vznika DRIV nez prvni bundle)",
+      "owner": "programmer",
+      "status": "navrzeno",
+      "refs": [
+        "D-09"
+      ]
+    },
+    {
+      "id": "B-05",
+      "title": "Jedna sada fixtur v types/<kind>/tests/, kterou prochazi server i klient (nahrada za generovane typy)",
+      "owner": "programmer",
+      "status": "navrzeno",
+      "refs": [
+        "D-08"
+      ]
+    },
+    {
+      "id": "B-06",
+      "title": "Strojovy test registru: kazda udalost ma needs; nikdo krome window_unlock nesmi mit step_up=EXEMPT",
+      "owner": "programmer",
+      "status": "navrzeno",
+      "refs": [
+        "D-06"
+      ]
+    },
+    {
+      "id": "B-07",
+      "title": "Docs pro M1: nastroj spravce, publikovane typy, remote apka",
+      "owner": "konzultant",
+      "status": "navrzeno",
+      "refs": []
+    }
+  ],
+  "next_actions_when_my_move": [
+    "Reagovat na dotazy programatora a na prvni verzi core/ (Audience a registr udalosti jsou dve mista, kde se rozhodne, jestli model drzi).",
+    "B-07: docs pro M1 - nastroj spravce, publikovane typy, remote apka."
+  ],
+  "history": [
+    {
+      "by": "programmer",
+      "turn": 1,
+      "at": "2026-08-19T11:48:24+02:00",
+      "summary": "Nastup na projekt. Precetl jsem README a vsech sest dokumentu v docs/, prosel jsem rozvrzeni viewBase2 (moduly, velikosti, testy, examples, docs/superpowers/plans+specs) a zalozil tento .statefile vcetne popisu predavaciho protokolu. Kod jsem zatim nepsal - drzim se toho, ze scaffold se nema psat pred rozhodnutim blokujicich bodu.",
+      "done": [
+        "precteno: README.md a vsech 6 dokumentu v docs/ (vcetne puvodniho konceptu, ktery je predmetem review)",
+        "prohlednuto: ../viewBase2 - strom modulu, velikosti souboru, seznam testu, examples, docs/superpowers/{plans,specs}, requirements.txt, hlavicka access.py",
+        "zalozen .statefile se strukturou pro predavani tahu a s vysvetlenim protokolu v klici working_with_statefile"
+      ],
+      "tested": [
+        "nic - v repu neni kod. Jedine overeni: platnost JSON tohoto souboru pres python3 -m json.tool."
+      ],
+      "unclear": [
+        "Viz questions - 6 blokujicich (Q-01 az Q-06) a 8 dalsich.",
+        "Nejvic me brzdi Q-02 (dve ruzna rozvrzeni repa ve dvou dokumentech) a Q-03 (kdy se vyhodnocuje publikum zpravy) - oboji urcuje tvar core/, tedy prvni napsany radek."
+      ],
+      "needs_verification": [
+        "Zda ma byt .statefile v gitu, nebo v .gitignore (ja bych ho commitoval - je to stopa rozhodovani, stejne jako docs/).",
+        "Zda mam brat viewBase2 access.py doslova (port 1:1 vcetne ceskych docstringu), nebo prepsat s anglickymi identifikatory a novym rozhranim Acl jako hodnoty - viz Q-07 a architektura-navrh.md par. 4b."
+      ],
+      "blocked": "Ano - cekam na odpovedi na Q-01 az Q-06. Do te doby nezakladam adresarovou strukturu ani neinstaluji zavislosti."
+    }
+  ]
+}

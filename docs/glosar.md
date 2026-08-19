@@ -1,0 +1,75 @@
+# Glosář: jedno jméno na pojem
+
+*Kanonická jména pro obě strany drátu i pro kód. Kdo píše kód, docs nebo
+schéma, používá tahle jména a žádná jiná.*
+
+---
+
+Dokumenty vznikaly postupně a mísí pojmy z různých vrstev (Workbench,
+screen-manager, Instance, apka, content provider, slupka). Pro kód je to
+past: dvě jména pro totéž se později srovnávají průchodem celého
+repozitáře. Tenhle soubor je proto **závazný** — když je potřeba jméno
+změnit, změní se tady a pak všude.
+
+## Základ
+
+| pojem | co to je | co to NENÍ |
+|---|---|---|
+| **Instance** | serverový runtime: vlastní politiku, relace, log, registr objektů a typů. To, co vzniká jako `vb.Instance(...)`. | není to proces ani kontejner — v jednom procesu jich může běžet víc |
+| **Workbench** | **klientská** část: chrome, správce oken, registr rendererů, loader typů | není to server; v původním konceptu to znamenalo celého hostitele — tenhle význam **zaniká** |
+| **Screen** | plocha (Amiga screen): titulek, téma, pořadí na liště, ACL | není to okno ani obrazovka prohlížeče |
+| **Window** | **rám** okna: geometrie, z-order, titulek, minimalizace, zámek. Vlastní ho runtime. | není to obsah okna |
+| **WindowType** (`kind`) | *jak se to vykreslí*: renderer + model obsahu + schéma + manifest | není to apka |
+| **App** | *odkud je obsah*: model, stav, doménová logika. In-process nebo kontejner. | neřídí chrome, nezakládá plochy, neautentizuje |
+| **Caller** | volající: relace prohlížeče i programový vstup, jeden typ pro obojí | není to uživatel — anonymní volající je taky Caller |
+| **Session** | relace prohlížeče (neprůhledné id v `localStorage`) | není to přihlášení — relace může být anonymní |
+| **Subject** | kdo je přihlášený (`user:hana`), nebo `anonymous` | není to Caller ani Session |
+
+**Zaniklé pojmy:** `screen-manager` (je to Instance/runtime), `slupka`
+(je to Window jako rám), `content provider` (je to App), `Project`
+(je to Instance).
+
+## Přístup
+
+| pojem | význam |
+|---|---|
+| **principál** | `user:hana`, `group:ucetni` — to, proti čemu se vyhodnocuje ACL |
+| **ACL** | množina povolených principálů. Žádné „deny". |
+| **sloveso** | `see` (vidět) / `write` (zasahovat) |
+| **krok navíc** (step-up) | „jsi to fakt ty, teď?" — kód z autentikátoru u soukromého okna. Ortogonální k ACL. |
+| **adresa** | `screen:<id>`, `screen:<id>/window:<id>`, `instance:log`. Klíč pro práva, log i vzdálené volání. |
+| **publikum** (Audience) | komu se zpráva smí doručit. `Ref(adresa, sloveso)` nebo `Session(sid)`. |
+| **schopnost** (capability) | co smí renderer nad rámec základu (`webgl`, `keyboard-capture`, …) |
+| **stupeň důvěry** (trust) | `core` / `trusted` / `sandboxed` |
+
+## Anglická jména v kódu
+
+Docstringy a komentáře jsou české, **identifikátory anglické**. Tabulka
+proto uvádí, jak se pojem jmenuje v kódu:
+
+| česky v textu | v kódu |
+|---|---|
+| plocha | `screen` |
+| okno (rám) | `window` |
+| typ okna | `window_type`, `kind` |
+| apka | `app` |
+| relace | `session` |
+| volající | `caller` |
+| principál | `principal` |
+| práva / přístup | `access`, `acl` |
+| publikum | `audience` |
+| krok navíc | `step_up` |
+| adresa | `address` |
+| stupeň důvěry | `trust` |
+| schopnost | `capability` |
+| plocha je brána | `screen_gate` |
+
+Totéž platí pro klíče payloadu, jména souborů, parametry cest v routách
+a jména v konfiguraci — anglicky. Texty pro diváka jdou ze serveru jako
+**klíč a parametry**, ne jako hotová věta; překlad je na klientovi.
+
+## Pojmenování v protokolu
+
+Na drátě se používají tatáž jména jako v kódu (`screen_id`, `window_id`,
+`kind`, `seq`). Žádné zkratky navíc a žádná druhá sada jmen: co se pošle,
+se musí dát najít v kódu grepem.
