@@ -589,9 +589,21 @@ ACL **registrace apky do průniku nepatří** — týká se **spouštěče**, te
 toho, kdo apku uvidí v nabídce. Když je okno otevřené na ploše, kterou divák
 vidí, nedává smysl mu obsah zavřít proto, že „na apku nemá".
 
-**Druhá úroveň se platí, jen když se použije:** ACL obsahu nenastavené
-neznamená žádné omezení navíc, takže v běžném případě je efektivní právo
-prostě právo okna a vývojář píše jednu sadu ACL.
+**Druhá úroveň se platí, jen když se použije.** A počítá se **výslovně**,
+ne třetím pravidlem v dědičnosti:
+
+```
+právo = právo okna  A  (obsah nemá ACL  NEBO  obsah pouští)
+```
+
+Nenastavené ACL obsahu tedy **není „nějaká výchozí hodnota"** — je to
+„druhá úroveň se nepoužila". Rozdíl je podstatný: dědičnost si tím udrží
+dvě chování (řetěz plochy končí na `default_access`, řetěz instance
+zavřeno) místo tří, a nepřidává se pravidlo, které by neumělo pojmenovat
+chybu, kterou zavírá (§1, šestý princip).
+
+**Obsah proto nemá dědičnost vůbec** — ACL buď má, nebo nemá. Není z čeho
+dědit: obsah neleží na ploše, leží u apky.
 
 ### Objekty místo řetězců, manifest se neopakuje
 

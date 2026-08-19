@@ -142,7 +142,7 @@ tam, kde na nich záleží — v `snapshot` a `apply_event`.
 Jeden obsah, dvě okna, **různá ACL**. Každé okno doručuje svým divákům podle
 **svého** ACL; apka o tom neví a vědět nemusí. Delta z obsahu se rozešle přes
 všechna okna, která na něj koukají, a každé si ji přefiltruje sámo — pořád je
-to `Ref(adresa okna, SEE)`, model publika se nemění.
+to `Ref(adresa okna, READ)`, model publika se nemění.
 
 Intuice říká opak, proto je to napsané výslovně.
 
