@@ -61,6 +61,55 @@ class Window:
         state = self._instance.content.state(self._app.handle)
         return ContentState.OK if state is None else state
 
+    def snapshot_for(self, caller) -> dict | None:
+        """Snapshot obsahu pro konkretniho divaka, nebo None.
+
+        Sestavit subjekt jde JEN ODSUD, protoze "co ten divak smi" je vlastnost
+        DVOJICE (volajici, okno) - `Caller` sam o sobe zadne okno nezna a jeho
+        schopnosti by zustaly navzdy prazdne (F-19). Tataz uvaha jako
+        `snapshot(for_session)` bez vychozi hodnoty v par. 3: kdyz funkce nevi,
+        komu odpovida, nesmi jit zavolat.
+
+        Kdo okno nevidi, nedostane nic - a nepozna to od okna, ktere neexistuje.
+        """
+        if self._app is None or self._app.handle is None:
+            return None
+        capabilities = self.capabilities_for(caller)
+        if "read" not in capabilities:
+            return None
+        return self._instance.content.snapshot_for(
+            self._app.handle, caller, capabilities
+        )
+
+    def capabilities_for(self, caller) -> list[str]:
+        """UZ ROZHODNUTE schopnosti divaka na tomhle okne.
+
+        Apka dostava tohle misto skupin (review, vyhrada 4): kdyby dostala
+        skupiny, vznikne druhy model prav vedle naseho, s jinou semantikou
+        a bez auditu - a za rok budou dve odpovedi na otazku "proc tohle vidi".
+
+          read   smi videt obsah tohohle okna
+          write  smi do nej zasahovat
+          own    smi s obsahem delat nevratne veci (D-41: vlastnik nebo
+                 spravce). Je to odpoved, ne role - apka se nedozvi, ze
+                 nekdo je spravce, jen ze na tohle ma.
+        """
+        from .events import Needs
+
+        instance = self._instance
+        capabilities = []
+        if instance.guard.may(caller, Needs.SEE, self.address):
+            capabilities.append("read")
+        if instance.guard.may(caller, Needs.WRITE, self.address):
+            capabilities.append("write")
+        if (
+            self._app is not None
+            and self._app.handle is not None
+            and instance.content.may_destroy(self._app.handle, caller)
+        ):
+            capabilities.append("own")
+        return capabilities
+
     def menu_for(self, caller) -> list[dict]:
         """Menu okna pro konkretniho divaka: dve skupiny a nic navic.
 

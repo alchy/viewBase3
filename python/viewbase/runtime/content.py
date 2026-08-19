@@ -43,6 +43,15 @@ SCOPES = ("window", "session", "user", "instance", "app", "explicit")
 #: osobni graf chce jedno okno do tehoz. Splynuti je chyba.
 _VIEWER_SCOPES = ("session", "user")
 
+#: Jak se apce predstavi VLASTNI KOD KNIHOVNY (F-17).
+#:
+#: Bez toho by kazde okno otevrene kodem aplikace dorazilo k apce jako
+#: 'anonymous' - a kazda apka, ktera si hlida vlastnictvi obsahu (a musi,
+#: viz D-43), by ho odmitla. Vlastni kod pritom otevira okno na SVUJ obsah;
+#: je to bezny pripad, ne rohovy. Kanal instance <-> apka je vzajemne
+#: autentizovany, takze tuhle identitu smi apka brat jako duveryhodnou.
+SERVICE_SUBJECT = "service:instance"
+
 #: Vychozi casove limity (D-32). Pomala apka smi zdrzet sebe, ne vysilaci smycku.
 DEFAULT_TIMEOUTS = {"open_content": 2.0, "snapshot": 2.0, "apply_event": 5.0}
 
@@ -73,10 +82,11 @@ class AppBackend(Protocol):
     okna nejsou.
     """
 
-    def open_content(self, handle: str, spec: dict) -> dict: ...
+    def open_content(self, handle: str | None, spec: dict, subject: dict) -> dict: ...
     def snapshot(self, handle: str, subject: dict) -> dict: ...
     def apply_event(self, handle: str, subject: dict, event: dict) -> list: ...
     def close_content(self, handle: str) -> None: ...
+    def list_content(self, subject: dict) -> list: ...
 
 
 @dataclass
@@ -103,12 +113,15 @@ def subject_of(caller: Caller, capabilities: list[str] | None = None) -> dict:
     NIKDY session id ani skupiny: session id je prihlasovaci udaj a skupiny by
     z apky udelaly druhe misto, kde se rozhoduje o pravech (review, vyhrady
     2 a 4). Schopnosti jsou UZ ROZHODNUTE - apka je nepocita, jen se jimi ridi.
+
+    `capabilities` se NEDAJI spocitat odsud a je to strukturalni, ne opomenuti
+    (F-19): "co ten divak smi" je vlastnost DVOJICE (volajici, okno), kdezto
+    `Caller` zadne okno nezna. Dosazuje je proto ten, kdo pohled ma - viz
+    `Window.snapshot_for`.
     """
-    subject_id = "anonymous"
-    for principal in caller.principals:
-        if principal.startswith("user:"):
-            subject_id = principal
-            break
+    from .instance_origin import subject_id_of
+
+    subject_id = subject_id_of(caller)
     return {
         "subject_id": subject_id,
         "correlation": caller.correlation,
@@ -252,8 +265,16 @@ class ContentRegistry:
 
     # -- volani apky ------------------------------------------------------
 
-    def snapshot_for(self, handle: str, caller: Caller, capabilities=None) -> dict | None:
-        """Snapshot pro konkretniho diváka, nebo None, kdyz apka neodpovida.
+    def snapshot_for(
+        self, handle: str, caller: Caller, capabilities: list[str]
+    ) -> dict | None:
+        """Snapshot pro konkretniho divaka, nebo None, kdyz apka neodpovida.
+
+        `capabilities` je POVINNY argument BEZ vychozi hodnoty. Kdyby ji mel,
+        dalo by se zavolat "pro nikoho konkretniho" a to pole by zustalo
+        prazdne navzdy (F-19) - tataz uvaha jako u `snapshot(sid=None)` ve
+        viewBase2, kde vychozi hodnota znamenala "kdyz se nikdo nepta pro koho,
+        dej vsechno". Sestavit je umi jen ten, kdo ma POHLED: Window.
 
         Vypadek je STAV OKNA, ne chyba: divak vidi ram, ostatni okna bezi dal.
         """
