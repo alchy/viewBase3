@@ -325,6 +325,37 @@ def test_reading_an_inheriting_acl_does_not_raise():
     assert window.access.see.list() == []
 
 
+# -- dedeni a "nikdo" jsou dva ruzne stavy (F-14) --------------------------
+
+
+def test_an_inheriting_object_says_it_inherits():
+    _, _, window = prepared()
+    assert window.access.see.inherits is True
+
+
+def test_an_object_with_its_own_acl_does_not_inherit():
+    _, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    assert window.access.see.inherits is False
+
+
+def test_an_explicitly_empty_acl_is_not_inheriting():
+    # `set([])` je rozhodnuti "nikdo". Kdyby se to nedalo odlisit od dedeni,
+    # vyvojar nepozna zavrene okno od okna, ktere bere prava po plose - a ty
+    # dva stavy maji pri dedicnosti opacne chovani.
+    _, _, window = prepared()
+    window.access.see.set([])
+    assert window.access.see.inherits is False
+    assert window.access.see.list() == []
+
+
+def test_write_inherits_even_when_see_is_set():
+    # Nenastavene write pri CTENI prav padne na see, ale vlastni ACL to neni.
+    _, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    assert window.access.write.inherits is True
+
+
 def test_screens_have_the_same_facade():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
@@ -502,7 +533,7 @@ def test_documented_line_opening_a_window_bound_to_an_app():
     w = screen.window.open("panel", id="hello",
                            title="Hello",
                            app="example.hello")
-    assert w.app == "example.hello"
+    assert w.app.id == "example.hello"
 
 
 def test_the_binding_is_made_by_whoever_opens_the_window():
@@ -512,6 +543,8 @@ def test_the_binding_is_made_by_whoever_opens_the_window():
     window = screen.window.open("panel", id="hello", app="example.hello")
     with pytest.raises(AttributeError):
         window.app = "nekdo.jiny"
+    with pytest.raises(AttributeError):
+        window.app.id = "nekdo.jiny"
 
 
 def test_an_app_cannot_enumerate_screens_or_windows():
@@ -582,9 +615,9 @@ def test_a_registration_keeps_what_the_document_declared():
     instance.app.register(
         "example.hello",
         kind="panel",
-        content="per-session",
+        scope="session",
         backend_base_url="http://hello-app:8080",
     )
     registration = instance.app.get("example.hello")
-    assert registration.content == "per-session"
+    assert registration.scope == "session"
     assert registration.backend_base_url == "http://hello-app:8080"

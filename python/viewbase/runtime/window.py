@@ -5,8 +5,24 @@ Runtime vlastni chrome: geometrii, z-order, titulek, zamek.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from ..core.addressing import Address
 from .access_facade import AccessFacade, AccessOwner
+from .content import ContentState
+
+
+@dataclass(frozen=True, slots=True)
+class WindowApp:
+    """Na co je okno napojene: ktera apka a ktery jeji obsah.
+
+    `handle` je None u scope `session` a `user` - tam se rukojet odvozuje az
+    od diváka a pri otevirani okna jeste zadny neni.
+    """
+
+    id: str
+    scope: str
+    handle: str | None = None
 
 
 class Window:
@@ -24,7 +40,7 @@ class Window:
         address: Address,
         kind: str,
         title: str | None,
-        app: str | None = None,
+        app: "WindowApp | None" = None,
     ) -> None:
         self._instance = instance
         self._app = app
@@ -34,7 +50,19 @@ class Window:
         self.access = AccessFacade(instance, address)
 
     @property
-    def app(self) -> str | None:
+    def content_state(self) -> ContentState:
+        """Stav obsahu z pohledu instance (D-32).
+
+        Okno bez apky je vzdycky OK: lokalni obsah dodava kod, ktery okno
+        otevrel, a nema co spadnout.
+        """
+        if self._app is None or self._app.handle is None:
+            return ContentState.OK
+        state = self._instance.content.state(self._app.handle)
+        return ContentState.OK if state is None else state
+
+    @property
+    def app(self) -> "WindowApp | None":
         """Odkud je obsah, nebo None pro lokalni obsah.
 
         Cte se, ale nenastavuje: vazbu zaklada ten, kdo okno otevira. Kdyby

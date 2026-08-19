@@ -25,6 +25,7 @@ from ..core.addressing import Address, new_id
 from ..core.identity import USERS
 from .access_facade import AccessFacade
 from .apps import AppCollection
+from .content import ContentRegistry
 from .events import EventRegistry, Guard
 from .registry import ObjectRegistry
 from .screen import Screen
@@ -114,6 +115,8 @@ class Instance:
         admin_access: Iterable[str] = (),
         knows_principal: Callable[[str], bool | None] | None = None,
         audit: list[AuditRecord] | None = None,
+        secret: str | bytes | None = None,
+        app_timeouts: dict[str, float] | None = None,
     ) -> None:
         self.objects = ObjectRegistry(default_access=Acl.from_iterable(default_access))
         self.events = EventRegistry()
@@ -128,7 +131,17 @@ class Instance:
         )
         self.access = AccessFacade(self, Address.instance_root())
         self.screen = ScreenCollection(self)
-        self.app = AppCollection()
+        # Tajemstvi instance razi rukojeti obsahu. Kdyz se ulozi a predа pri
+        # startu, prezijou ulozene rukojeti i restart instance (D-29).
+        self._secret = (
+            secret.encode("utf-8") if isinstance(secret, str)
+            else secret if secret is not None
+            else new_id().encode("utf-8")
+        )
+        self.content = ContentRegistry(
+            self._secret, app_timeouts, audit=self._record_from_content
+        )
+        self.app = AppCollection(self.content)
         self.guard = Guard(events=self.events, objects=self.objects, grants=self.grants)
 
     # -- jedina cesta ke zmene prav (D-14) -------------------------------
@@ -212,6 +225,9 @@ class Instance:
                 "access", "unknown_principal", address, None,
                 f"{name} neni znam zdroji identit - preklep?",
             )
+
+    def _record_from_content(self, component: str, action: str, detail: str = "") -> None:
+        self._record(component, action, detail=detail)
 
     def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
         return f"<Instance screens={len(self._screens)}>"

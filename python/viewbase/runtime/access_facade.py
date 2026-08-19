@@ -67,6 +67,18 @@ class AclView:
         own = self._owner.own_acl(self._address, self._verb)
         return [] if own is None else list(own)
 
+    @property
+    def inherits(self) -> bool:
+        """Bere tenhle objekt prava od rodice?
+
+        `list()` sama o sobe dva ruzne stavy nerozlisi: prazdny seznam vrati
+        jak objekt, ktery DEDI, tak objekt s vyslovne prazdnym ACL ("nikdo").
+        Model je ale rozlisuje a maji opacne chovani (nalez F-14). `list()`
+        proto dal vraci vzdycky seznam - iterovat pres None by bylo horsi nez
+        ta nejednoznacnost - a odpoved na "dedis?" je vlastni otazka.
+        """
+        return self._owner.own_acl(self._address, self._verb) is None
+
     def set(self, names) -> None:
         """Dej objektu vlastni ACL. Tim mu konci dedeni - a je to videt."""
         self._owner.set_access(self._address, self._verb, Acl.from_iterable(names))

@@ -17,7 +17,7 @@ from __future__ import annotations
 from ..core.access import Access
 from ..core.addressing import Address, new_id
 from .access_facade import AccessFacade, AccessOwner
-from .window import Window
+from .window import Window, WindowApp
 
 
 class WindowCollection:
@@ -39,6 +39,7 @@ class WindowCollection:
         id: str | None = None,
         title: str | None = None,
         app: str | None = None,
+        handle: str | None = None,
         access: Access | None = None,
     ) -> Window:
         """Otevri okno daneho typu a volitelne ho spoj s apkou.
@@ -54,6 +55,10 @@ class WindowCollection:
         pri volani, aby jedna mrtva apka nezastavila celou instanci.
 
         Bez `app` je obsah LOKALNI: dodava ho kod, ktery okno otevrel.
+
+        `handle` napoji okno na UZ EXISTUJICI obsah - dve okna pak koukaji na
+        totez (D-26). Bez nej se rukojet odvodi ze `scope` apky; u `explicit`
+        je povinny, protoze tam obsah zaklada nekdo jiny.
         """
         screen = self._screen
         instance = screen._instance
@@ -67,10 +72,32 @@ class WindowCollection:
         if app is not None:
             self._check_app(app, kind)
 
+        window_app = None
+        if app is not None:
+            window_app = self._bind_content(app, address, handle)
+
         instance.objects.add(address, access if access is not None else Access())
-        window = Window(instance, address, kind, title, app)
+        window = Window(instance, address, kind, title, window_app)
         screen._windows[window_id] = window
         return window
+
+    def _bind_content(self, app: str, address, handle: str | None) -> WindowApp:
+        """Zjisti rukojet obsahu a napoj na nej pohled."""
+        instance = self._screen._instance
+        registration = instance.app.get(app)
+        scope = registration.scope
+
+        if handle is None:
+            if scope == "explicit":
+                raise ValueError(
+                    f"apka {app!r} ma scope 'explicit' - obsah zaklada nekdo jiny, "
+                    f"takze se okno musi otevrit s handle=..."
+                )
+            handle = instance.content.handle_for(app, scope, address)
+
+        if handle is not None:
+            instance.content.attach(handle, app, address, {"kind": registration.kind})
+        return WindowApp(id=app, scope=scope, handle=handle)
 
     def _check_app(self, app: str, kind: str) -> None:
         registry = self._screen._instance.app
@@ -95,6 +122,9 @@ class WindowCollection:
         instance = self._screen._instance
         instance.objects.remove(window.address)
         instance.grants.revoke_object(window.address)
+        # Zavreni okna je ODPOJENI POHLEDU, ne smrt obsahu (D-26).
+        if window.app is not None and window.app.handle is not None:
+            instance.content.detach(window.app.handle, window.address)
 
     def all(self) -> tuple[Window, ...]:
         return tuple(self._screen._windows.values())
