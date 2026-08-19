@@ -64,23 +64,23 @@ def firma():
                                      read=["group:public"], write=[])  # [] = nikdo
 
     # -- 4. dokumenty: obsah, ktery prezije zavreni okna --------------------
-    cnt_mzdy = app_excel.content.open(name="Mzdy.xls",
+    cnt_mzdy = app_excel.content.open(title="Mzdy.xls",
                                       read=["group:uctarna", "user:novak"],
                                       write=["group:uctarna"])
 
-    cnt_rizika = app_excel.content.open(name="Rizika.xls",
+    cnt_rizika = app_excel.content.open(title="Rizika.xls",
                                         read=["group:risk", "user:novak"],
                                         write=["group:risk"])
 
     # -- 5. nabidky: co jde kde otevrit -------------------------------------
-    scr_uctarna.app.register(app_excel, title="Mzdy.xls", content=cnt_mzdy,
-                             require_authentication=True)   # navic si rekne o kod
-    scr_uctarna.app.register(app_excel, title="Novy sesit")  # bez content
+    # Apka i titulek se berou z obsahu (D-66, D-67) - nic se neopakuje.
+    scr_uctarna.app.register(cnt_mzdy, require_authentication=True)  # + krok navic
+    scr_uctarna.app.register(app_excel, title="Novy sesit")          # bez obsahu
 
-    scr_risk.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
-    scr_risk.app.register(app_excel, title="Mzdy.xls",   content=cnt_mzdy)
+    scr_risk.app.register(cnt_rizika)
+    scr_risk.app.register(cnt_mzdy)
 
-    scr_zasedacka.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
+    scr_zasedacka.app.register(cnt_rizika)
 
     return locals()
 
@@ -189,8 +189,7 @@ def test_putting_a_document_on_a_public_screen_does_not_publish_it():
     """Tohle je ta chyba, kvuli ktere druha uroven vznikla - a tady se uz
     napsat neda."""
     f = firma()
-    f["scr_zasedacka"].app.register(f["app_excel"], title="Mzdy.xls",
-                                    content=f["cnt_mzdy"])
+    f["scr_zasedacka"].app.register(f["cnt_mzdy"])
 
     assert nabidky(f["scr_zasedacka"], ANONYM) == []
     assert nabidky(f["scr_zasedacka"], HANA) == ["Mzdy.xls"]

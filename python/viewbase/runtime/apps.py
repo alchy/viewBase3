@@ -27,18 +27,31 @@ MENU_GROUP_MAX = 24
 MENU_ITEM_TYPES = ("command", "toggle", "choice")
 
 
-@dataclass(frozen=True, slots=True)
 class NamedContent:
     """Obsah, ktery PREZIJE JEDNO OKNO (D-59).
 
     Potreba jen ve trech pripadech - tyz obsah na dvou plochach, plneni
     davkovou ulohou, jina prava na obsah nez na okno. V beznem pripade si
     obsah vyrobi nabidka sama a tahle cesta se nepise vubec.
+
+    ZNA SVOU APKU (D-67). Diky tomu se pri registraci nabidky apka neopakuje -
+    a chyba "content patri jine apce, nez jsem uvedl" prestane byt
+    vyjadritelna. To je silnejsi nez ji kontrolovat.
+
+    `title` je promenlivy zamerne: prejmenovani dokumentu za behu se ma
+    projevit v menu vsude, kde na nej nabidka odkazuje (D-66).
     """
 
-    handle: str
-    name: str | None
-    access: object = field(default=None, repr=False, compare=False)
+    __slots__ = ("handle", "title", "access", "app")
+
+    def __init__(self, handle, title, access, app) -> None:
+        self.handle = handle
+        self.title = title
+        self.access = access
+        self.app = app
+
+    def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
+        return f"<Content {self.title!r} of {self.app.app_id}>"
 
 
 class ContentCollection:
@@ -50,7 +63,7 @@ class ContentCollection:
         self._registration = registration
         self._instance = instance
 
-    def open(self, *, name: str | None = None, read=None, write=None,
+    def open(self, *, title: str | None = None, read=None, write=None,
              spec: dict | None = None) -> NamedContent:
         """Zaloz obsah, ktery existuje sam o sobe - jeste nez je jake okno."""
         content = self._instance.content
@@ -61,7 +74,9 @@ class ContentCollection:
             facade.read.set(read)
         if write is not None:
             facade.write.set(write)
-        return NamedContent(handle=handle, name=name, access=facade)
+        return NamedContent(
+            handle=handle, title=title, access=facade, app=self._registration
+        )
 
 
 @dataclass(frozen=True, slots=True)

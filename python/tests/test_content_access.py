@@ -240,3 +240,93 @@ def test_asking_about_content_that_is_not_there_is_an_error():
     instance = vb.Instance()
     with pytest.raises(KeyError):
         instance.content.access("vb1_neexistuje")
+
+
+# ===========================================================================
+# Treti pripad: PRAVA ZUZENA POD RUKAMA (D-69)
+#
+# Kazda vlastnost, ktera se dotyka prav, ma mit tri pripady, ne dva: plna
+# prava, zadna prava a "nekdo zmenil ACL potom, co objekt vznikl". Tenhle
+# treti stav v deklaraci nevznikne a v provozu vznika porad - a prave on
+# nechytil nalez F-22, protoze vsech 549 testu testovalo jen prvni dva.
+# ===========================================================================
+
+
+def zalozeno_hanou():
+    """Obsah zalozeny hanou, na ktery ma zatim plna prava."""
+    instance = vb.Instance(default_access=[USERS])
+    register_app(instance, "a", kind="graph", scope="app", backend=FakeApp())
+    screen = instance.screen.open(id="infra", read=[USERS], write=[USERS])
+    hana = Caller.for_user("hana")
+    window = open_window(screen, "graph", id="net", app="a", by=hana)
+    window.access.read.set([USERS])
+    window.access.write.set([USERS])
+    return instance, window, hana
+
+
+def test_the_founder_starts_with_everything():
+    _, window, hana = zalozeno_hanou()
+    assert window.capabilities_for(hana) == ["read", "write", "manage"]
+
+
+def test_a_stranger_starts_with_nothing_extra():
+    instance, window, _ = zalozeno_hanou()
+    assert window.capabilities_for(Caller.for_user("petr")) == ["read", "write"]
+
+
+def test_the_founder_loses_manage_when_the_content_is_narrowed_under_them():
+    # D-68: manage VYZADUJE read. Kdyby zustalo, vyzamknuty zakladatel by mel
+    # dal pravo prejmenovat a zmenit ACL - tedy si pristup vratit. Bezpecnostni
+    # ovladani, ktere vypada, ze zabralo, a nezabralo, je horsi nez zadne.
+    instance, window, hana = zalozeno_hanou()
+    instance.content.access(window.app.handle).read.set(["group:auditor"])
+    assert window.capabilities_for(hana) == []
+
+
+def test_the_founder_keeps_manage_while_they_still_have_read():
+    # Zuzeni, ktere zakladatele nechava uvnitr, mu manage nebere.
+    instance, window, hana = zalozeno_hanou()
+    instance.content.access(window.app.handle).read.set(["user:hana"])
+    assert "manage" in window.capabilities_for(hana)
+
+
+def test_narrowing_the_window_alone_also_takes_manage():
+    # Prunik ma dva cleny; zuzit staci kterykoli z nich.
+    instance, window, hana = zalozeno_hanou()
+    window.access.read.set(["group:auditor"])
+    assert window.capabilities_for(hana) == []
+
+
+def test_the_administrator_gets_back_in_after_a_narrowing():
+    # Cesta zpatky vede pres spravce, ktery stoji nad ACL - to je ta vedome
+    # prijata cena za D-68.
+    instance, window, hana = zalozeno_hanou()
+    instance.content.access(window.app.handle).read.set(["group:auditor"])
+    spravce = Caller.for_user("spravce", ["administrator"])
+    assert "manage" in window.capabilities_for(spravce)
+
+
+def test_widening_it_back_restores_manage_at_once():
+    # Pozdni vazba: prava se ctou pri kazdem dotazu, ne pri vzniku okna.
+    instance, window, hana = zalozeno_hanou()
+    instance.content.access(window.app.handle).read.set(["group:auditor"])
+    instance.content.access(window.app.handle).read.set([USERS])
+    assert "manage" in window.capabilities_for(hana)
+
+
+def test_an_offer_disappears_when_the_content_is_narrowed_under_it():
+    # Tyz treti pripad o patro vys: nabidka uz visi a nekdo zuzi obsah.
+    instance = vb.Instance(default_access=[USERS])
+    from tests.test_offer import GraphApp  # apka s manifestem
+
+    app = instance.app.register(GraphApp())
+    scr = instance.screen.open(id="infra", read=[USERS])
+    cnt = app.content.open(title="Mapa")
+    scr.app.register(cnt)
+    hana = Caller.for_user("hana")
+
+    assert len(scr.app.visible_to(hana)) == 1
+
+    cnt.access.read.set(["group:auditor"])
+
+    assert scr.app.visible_to(hana) == ()

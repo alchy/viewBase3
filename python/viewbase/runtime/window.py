@@ -102,12 +102,11 @@ class Window:
 
           read   smi videt obsah tohohle okna
           write  smi do nej zasahovat
-          manage smi s obsahem delat nevratne veci (D-41: vlastnik nebo
-                 spravce). Je to odpoved, ne role - apka se NEDOZVI, kdo
-                 z nich to je, jen ze na to ma. Kdyby dostala "je
-                 spravce", musela by si pravidlo "spravce smi i cizi"
-                 odvodit sama - a to je druhe misto, kde totez pravidlo
-                 zije (D-49).
+          manage smi s obsahem delat nevratne veci - prejmenovat, zrusit,
+                 zmenit prava. Odvozuje se ze zakladatelstvi nebo spravcovstvi
+                 (D-41, D-50) a VYZADUJE READ (D-68): bez prava objekt vnimat
+                 neni s cim nakladat. Je to odpoved, ne role - apka se NEDOZVI,
+                 kdo z nich to je, jen ze na to ma.
         """
         from .events import Needs
 
@@ -117,8 +116,15 @@ class Window:
             capabilities.append("read")
         if instance.guard.may(caller, Needs.WRITE, self.address):
             capabilities.append("write")
+        # MANAGE VYZADUJE READ (D-68). Kdo na objekt nema read, nedostane ani
+        # manage - ani zakladatel. Jinak by vyzamknuty zakladatel mel dal
+        # pravo prejmenovat a zmenit ACL, tedy si pristup vratit; bezpecnostni
+        # ovladani, ktere vypada, ze zabralo, a nezabralo, je horsi nez zadne.
+        # Zakladatel se tim da vyzamknout - cesta zpatky vede pres spravce,
+        # ktery stoji nad ACL.
         if (
-            self._app is not None
+            "read" in capabilities
+            and self._app is not None
             and self._app.handle is not None
             and instance.content.may_destroy(self._app.handle, caller)
         ):

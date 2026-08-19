@@ -35,14 +35,31 @@ class Offer:
     ACL se deklaruje TADY a okno, ktere z nabidky vznikne, ho zdedi.
     """
 
-    __slots__ = ("_screen", "app", "title", "_access", "_content")
+    __slots__ = ("_screen", "app", "_title", "_access", "_content")
 
     def __init__(self, screen, app, title, access, content) -> None:
         self._screen = screen
         self.app = app
-        self.title = title
+        self._title = title
         self._access = access
         self._content = content
+
+    @property
+    def title(self) -> str | None:
+        """Popisek v nabidce.
+
+        NENASTAVENY JE ODKAZ, NASTAVENY JE HODNOTA (D-66): kdyz se neuvede,
+        cte se z obsahu ZIVE, takze prejmenovani dokumentu za behu se projevi
+        v menu. Kdyz se uvede, je to pevny stitek te jedne plochy.
+
+        Nejsou to dve jmena tehoz: `content.title` patri DOKUMENTU (meni ho
+        uzivatel, plati vsude stejne), `offer.title` patri POLOZCE MENU jedne
+        plochy (pise ho vyvojar, na kazde plose muze byt jina). Kdyby to bylo
+        jedno pole, prejmenovani dokumentu by prepsalo vyvojarovo menu vsude.
+        """
+        if self._title is not None:
+            return self._title
+        return self._content.title if self._content is not None else None
 
     @property
     def id(self) -> str:
@@ -90,21 +107,43 @@ class OfferCollection:
 
     def register(
         self,
-        app,
+        app_or_content,
         *,
         title: str | None = None,
         read=None,
         write=None,
         require_authentication: bool = False,
-        content=None,
     ) -> Offer:
-        """Nabidni apku na tehle plose.
+        """Nabidni na tehle plose apku, nebo konkretni obsah.
 
-        Nesaha se pritom na zadne okno, protoze zadne jeste neni. Bez
-        `content=` si obsah vyrobi nabidka sama pri otevreni a zadne vlastni
-        ACL nedostane - druha uroven se tim vubec nezapoji (D-59).
+        Ctyri tvary a zadny jiny:
+
+            register(cnt_mzdy)                 apka i titulek z obsahu, zive
+            register(cnt_mzdy, title="...")    apka z obsahu, titulek pevny
+            register(app_excel, title="...")   apka uvedena, titulek povinny
+            register(app_excel)                CHYBA pri startu
+
+        Obsah se predava PRVNIM ARGUMENTEM, ne kwargem - jinak by existovaly
+        dve cesty k teze nabidce. A apka se z nej odvodi (D-67): jmenovat
+        obojí jde napsat nesouhlasne, takze by runtime musel hlidat, ze
+        `content` patri te apce; kdyz se odvodi, ta chyba prestane byt
+        vyjadritelna.
+
+        Nesaha se pritom na zadne okno, protoze zadne jeste neni. Bez obsahu
+        si ho nabidka vyrobi sama pri otevreni a zadne vlastni ACL mu neda -
+        druha uroven se tim vubec nezapoji (D-59).
         """
         instance = self._screen._instance
+        content = None
+        app = app_or_content
+        if hasattr(app_or_content, "handle"):  # je to obsah
+            content = app_or_content
+            app = content.app
+        elif title is None:
+            raise ValueError(
+                f"nabidka apky {getattr(app, 'app_id', app)!r} bez obsahu potrebuje "
+                f"title - neni podle ceho ji pojmenovat"
+            )
         if getattr(app, "instance", None) is not instance:
             raise ValueError(
                 f"apka {getattr(app, 'app_id', app)!r} neni registrovana v teto instanci"

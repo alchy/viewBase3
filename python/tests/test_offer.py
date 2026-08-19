@@ -220,8 +220,8 @@ def test_a_viewer_who_cannot_read_the_content_gets_no_offer():
     # ktery dela cely model: tataz nabidka na tez plose se dvema lidem chova
     # jinak, protoze rozhodl obsah.
     instance, graf, provoz = prepared()
-    cnt = graf.content.open(name="Mzdy", read=["group:ucetni"])
-    provoz.app.register(graf, title="Mzdy", content=cnt)
+    cnt = graf.content.open(title="Mzdy", read=["group:ucetni"])
+    provoz.app.register(cnt)
 
     assert provoz.app.visible_to(Caller.for_user("petr")) == ()
     assert len(provoz.app.visible_to(Caller.for_user("hana", ["ucetni"]))) == 1
@@ -310,21 +310,73 @@ def test_an_app_scoped_app_shares_content_across_windows():
 
 
 def test_the_documented_named_content_on_two_screens():
-    # architektura-navrh.md, dodatek - doslova.
-    instance = vb.Instance(default_access=[USERS])
-    graf = instance.app.register(GraphApp())
-    hala = instance.screen.open(id="hala")
-    uctarna = instance.screen.open(id="uctarna")
+    # architektura-navrh.md, dodatek - doslova. Apka se odvodi z obsahu (D-67)
+    # a titulek taky (D-66), takze se nic neopakuje.
+    inst = vb.Instance(default_access=[USERS])
+    app_graf = inst.app.register(GraphApp())
+    scr_hala = inst.screen.open(id="hala")
+    scr_uctarna = inst.screen.open(id="uctarna")
 
-    mapa = graf.content.open(name="Mapa site",
-                             read=["group:zamestnanci"], write=["group:site"])
-    hala.app.register(graf, title="Mapa site", content=mapa)
-    uctarna.app.register(graf, title="Mapa site", content=mapa)
+    cnt_mapa = app_graf.content.open(title="Mapa site",
+                                     read=["group:zamestnanci"], write=["group:site"])
+    scr_hala.app.register(cnt_mapa)
+    scr_uctarna.app.register(cnt_mapa)
 
     assert (
-        hala.app.all()[0].open(HANA).app.handle
-        == uctarna.app.all()[0].open(HANA).app.handle
+        scr_hala.app.all()[0].open(HANA).app.handle
+        == scr_uctarna.app.all()[0].open(HANA).app.handle
     )
+
+
+def test_the_offer_takes_its_title_from_the_content():
+    inst = vb.Instance(default_access=[USERS])
+    app_graf = inst.app.register(GraphApp())
+    scr = inst.screen.open(id="hala")
+    cnt = app_graf.content.open(title="Mapa site")
+    assert scr.app.register(cnt).title == "Mapa site"
+
+
+def test_an_unset_title_is_a_reference_not_a_copy():
+    # Prejmenovani dokumentu za behu se ma projevit v menu.
+    inst = vb.Instance(default_access=[USERS])
+    app_graf = inst.app.register(GraphApp())
+    cnt = app_graf.content.open(title="Mapa site")
+    off = inst.screen.open(id="hala").app.register(cnt)
+
+    cnt.title = "Topologie"
+
+    assert off.title == "Topologie"
+
+
+def test_a_set_title_is_a_value_not_a_reference():
+    # Pevny stitek jedne plochy: `content.title` patri dokumentu,
+    # `offer.title` polozce menu. Kdyby to bylo jedno pole, prejmenovani
+    # dokumentem by prepsalo vyvojarovo menu vsude.
+    inst = vb.Instance(default_access=[USERS])
+    app_graf = inst.app.register(GraphApp())
+    cnt = app_graf.content.open(title="Mapa site")
+    off = inst.screen.open(id="hala").app.register(cnt, title="Rizika")
+
+    cnt.title = "Topologie"
+
+    assert off.title == "Rizika"
+
+
+def test_an_offer_without_content_must_be_named():
+    inst = vb.Instance(default_access=[USERS])
+    app_graf = inst.app.register(GraphApp())
+    with pytest.raises(ValueError, match="title"):
+        inst.screen.open(id="hala").app.register(app_graf)
+
+
+def test_the_app_is_never_named_twice():
+    # D-67: jmenovat apku i obsah jde napsat NESOUHLASNE. Kdyz se apka odvodi,
+    # ta chyba prestane byt vyjadritelna - to je silnejsi nez ji kontrolovat.
+    import inspect
+
+    from viewbase.runtime.screen import OfferCollection
+
+    assert "content" not in inspect.signature(OfferCollection.register).parameters
 
 
 def test_named_content_keeps_its_own_access():
@@ -333,26 +385,39 @@ def test_named_content_keeps_its_own_access():
     graf = instance.app.register(GraphApp())
     hala = instance.screen.open(id="hala")
 
-    mapa = graf.content.open(name="Mapa", read=[USERS], write=["group:site"])
-    okno = hala.app.register(graf, title="Mapa", content=mapa,
-                             read=[USERS], write=[USERS]).open(HANA)
+    mapa = graf.content.open(title="Mapa", read=[USERS], write=["group:site"])
+    okno = hala.app.register(mapa, read=[USERS], write=[USERS]).open(HANA)
 
     capabilities = okno.capabilities_for(Caller.for_user("petr"))
     assert "read" in capabilities
     assert "write" not in capabilities
 
 
-def test_named_content_carries_its_name():
+def test_named_content_carries_its_title():
+    # D-65: popisek se u VSECH objektu jmenuje title - plocha, okno, obsah
+    # i nabidka. `name` v tomhle vyznamu neexistuje.
     instance = vb.Instance()
     graf = instance.app.register(GraphApp())
-    assert graf.content.open(name="Mapa site").name == "Mapa site"
+    assert graf.content.open(title="Mapa site").title == "Mapa site"
+
+
+def test_content_has_no_name_field_any_more():
+    instance = vb.Instance()
+    graf = instance.app.register(GraphApp())
+    assert not hasattr(graf.content.open(title="Mapa"), "name")
 
 
 def test_named_content_has_a_handle_before_any_window_exists():
     # Davkova uloha ho musi umet naplnit driv, nez nekdo neco otevre.
     instance = vb.Instance()
     graf = instance.app.register(GraphApp())
-    assert graf.content.open(name="Mapa").handle
+    assert graf.content.open(title="Mapa").handle
+
+
+def test_named_content_knows_its_own_app():
+    instance = vb.Instance()
+    graf = instance.app.register(GraphApp())
+    assert graf.content.open(title="Mapa").app is graf
 
 
 # ===========================================================================
