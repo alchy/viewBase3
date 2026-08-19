@@ -579,12 +579,42 @@ nenastavené `manage` by spadlo až na `default_access`, takže by objekt směl
 zrušit kdokoli přihlášený, a musela by se přidat výjimka „manage se dědí
 jinak". Pravidlo navíc kvůli vlastnosti, kterou skoro nikdo nepoužije.
 
-**Odvodí se ale jen tam, kde platí `read`.** Zakladatelství samo nestačí:
-kdo na objekt nemá `read`, nemá ani `manage`. Bez té podmínky vyjde
-„smíš nevratně zasáhnout do něčeho, co ani nevidíš" — a co je horší, kdo
-zakladateli práva zúžil, by mu nevzal nic a myslel si, že vzal. Zamknout
-se dá i sám sebe; cesta zpátky vede přes **správce**, který stojí nad ACL.
-Vyšlo to z F-22 a nenašla to testovací sada, ale spuštěný skript.
+#### Šipka ukazuje jedním směrem
+
+```
+manage  ⟹  write  ⟹  read
+```
+
+Čte se **zleva doprava a nikdy zpátky**: kdo má `manage`, má i `write`;
+kdo má `write`, má i `read`. Opačně to neplatí — **`write` nikoho
+nepovyšuje na `manage`.** `manage` zůstává odvozený ze zakladatelství nebo
+správcovství; `write` je jen jeho **nutná** podmínka, ne dostatečná.
+
+Obě implikace zavírají tutéž chybu, jen o patro jinde:
+
+- **`manage ⟹ write`**: kdo smí měnit ACL, si `write` udělí jedním krokem.
+  Odepřít mu ho je divadlo — a hůř, kdo mu práva zúžil, by si myslel, že
+  mu je vzal, a nevzal by mu nic.
+- **`write ⟹ read`**: editovat, na co se nedá dívat, nedává smysl. Dnes to
+  šlo zapsat a neznamenalo to nic.
+
+V kódu z toho plynou dvě věty:
+
+```
+read_effective = read ∪ write
+manage         = (zakladatel nebo správce) ∧ ∈ write
+```
+
+**`read` se tedy nemusí opakovat** — kdo je ve `write`, čte automaticky.
+Aby to nesvádělo k podcenění rozsahu, každé **zpětné čtení** (výpis
+správce, auditní řádek, odpověď API) tiskne vždycky **efektivní** množinu,
+ne to, co je doslova v deklaraci. Zdroják je zkratka autora; odpověď
+systému je úplná.
+
+Zakladatel se tím dá vyzamknout z vlastní věci. Přijímáme to vědomě: zúžit
+ACL smí jen ten, kdo sám má `manage`, a nad ACL pořád stojí **správce** —
+cesta zpátky vždycky existuje. Vyšlo to z F-22, a nenašla to testovací
+sada, ale spuštěný skript.
 
 ### Průnik má dva členy
 
