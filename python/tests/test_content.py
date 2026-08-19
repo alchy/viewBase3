@@ -185,10 +185,15 @@ def test_session_and_user_scopes_have_no_handle_at_open_time():
         assert w.app.scope == scope
 
 
-def test_explicit_scope_demands_a_handle():
+def test_explicit_scope_makes_a_new_document_on_every_click():
+    # DRIVE to byla chyba ("obsah zaklada nekdo jiny, otevri s handle="),
+    # protoze okno se otviralo primo. Ted okno vznika z nabidky a ta obsah
+    # vzdycky dodá: bud pripnuty (content=), nebo cerstvy. "Novy sesit"
+    # v prikladu z dodatku je prave tenhle pripad.
     _, screen = with_graph(scope="explicit")
-    with pytest.raises(ValueError, match="handle"):
-        open_window(screen, "graph", id="net", app="workbench.graph")
+    prvni = open_window(screen, "graph", id="a", app="workbench.graph")
+    druhy = open_window(screen, "graph", id="b", app="workbench.graph")
+    assert prvni.app.handle != druhy.app.handle
 
 
 def test_an_unknown_scope_is_refused_at_registration():

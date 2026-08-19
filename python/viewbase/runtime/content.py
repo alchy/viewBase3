@@ -221,6 +221,13 @@ class ContentRegistry:
         handle = self._by_view.get(window)
         if handle is None:
             return True
+        return self.allows_handle(handle, verb, caller)
+
+    def allows_handle(self, handle: str, verb, caller) -> bool:
+        """Tataz otazka polozena rovnou na rukojet - pro nabidky, ktere jeste
+        zadne okno nemaji."""
+        from ..core.access import allowed
+
         acl = self._owner.objects.access_of(Address.content(handle)).for_verb(verb)
         if acl is None:
             return True

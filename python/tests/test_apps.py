@@ -54,8 +54,36 @@ def instance_with(app=None, **kwargs):
 
 
 # ===========================================================================
-# Registrace apky je objekt s vlastnim ACL (D-36)
+# Registrace apky je objekt - ale BEZ PRAV (D-60)
+#
+# Apka je jen deklarace "tenhle kod existuje a umi tenhle kind". Kdo nabidku
+# uvidi, rozhoduje PLOCHA a OBSAH. Treti ACL nezaviralo nic, co ty dve
+# nezavrou taky, a globalni vypinac existuje i bez nej - odregistrovana apka
+# bere sve nabidky s sebou.
 # ===========================================================================
+
+
+def test_an_app_registration_carries_no_rights():
+    instance = instance_with()
+    assert not hasattr(instance.app.get("workbench.graph"), "access")
+
+
+def test_registering_an_app_with_rights_is_refused():
+    # Tise ignorovat by znamenalo, ze si nekdo mysli, ze apku skryl.
+    class App:
+        manifest = {"app_id": "x", "kind": "panel", "scope": "window"}
+
+    with pytest.raises(TypeError):
+        vb.Instance().app.register(App(), read=["group:ucetni"])
+
+
+def test_the_manifest_cannot_be_overridden():
+    # D-63: druhe misto, kde zije tataz hodnota, se rozejde nejtiseji.
+    class App:
+        manifest = {"app_id": "x", "kind": "panel", "scope": "window"}
+
+    with pytest.raises(TypeError):
+        vb.Instance().app.register(App(), scope="app")
 
 
 def test_registering_an_app_puts_it_in_the_object_registry():
@@ -63,42 +91,14 @@ def test_registering_an_app_puts_it_in_the_object_registry():
     assert Address.app("workbench.graph") in instance.objects
 
 
-def test_an_app_can_be_hidden_from_most_people():
-    instance = instance_with()
-    instance.app.get("workbench.graph").access.read.set(["group:ucetni"])
-    acl = instance.objects.resolve(Address.app("workbench.graph"), Verb.READ)
-    assert acl == Acl.of("group:ucetni")
 
 
-def test_the_launcher_shows_only_apps_the_viewer_may_read():
-    # Spoustec je vec WORKBENCHE - stavi ho z registru apek a filtruje nasim
-    # modelem. Apka do nej nic nevklada.
-    instance = instance_with()
-    register_app(instance, "tajna", kind="panel", scope="app", backend=OpenApp())
-    instance.app.get("tajna").access.read.set(["group:ucetni"])
-
-    visible = {r.app_id for r in instance.app.visible_to(Caller.for_user("petr"))}
-    assert visible == {"workbench.graph"}
 
 
-def test_the_launcher_shows_the_hidden_app_to_those_who_may_read_it():
-    instance = instance_with()
-    instance.app.get("workbench.graph").access.read.set(["group:ucetni"])
-    visible = instance.app.visible_to(Caller.for_user("hana", ["ucetni"]))
-    assert [r.app_id for r in visible] == ["workbench.graph"]
 
 
-def test_the_administrator_sees_every_app():
-    instance = instance_with()
-    instance.app.get("workbench.graph").access.read.set([])
-    visible = instance.app.visible_to(Caller.for_user("spravce", ["administrator"]))
-    assert [r.app_id for r in visible] == ["workbench.graph"]
 
 
-def test_an_anonymous_viewer_sees_no_app_by_default():
-    instance = vb.Instance(default_access=[USERS])
-    register_app(instance, "workbench.graph", kind="graph", scope="app", backend=OpenApp())
-    assert instance.app.visible_to(Caller.anonymous()) == ()
 
 
 def test_removing_an_app_takes_its_object_away():

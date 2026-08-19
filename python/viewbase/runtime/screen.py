@@ -14,7 +14,7 @@ privilegovanou cestu (typy-oken.md par. 3).
 """
 from __future__ import annotations
 
-from ..core.access import Access, Acl
+from ..core.access import Access, Acl, Verb
 from ..core.addressing import Address, new_id
 from .access_facade import AccessFacade, AccessOwner
 from .window import Window, WindowApp
@@ -47,6 +47,17 @@ class Offer:
     @property
     def id(self) -> str:
         return self.app.app_id
+
+    def _readable_by(self, caller) -> bool:
+        """Pousti obsah, ke kteremu je nabidka pripnuta, tohohle divaka?
+
+        Nabidka bez obsahu se neptá nikoho: obsah vznikne az kliknutim.
+        """
+        if self._content is None:
+            return True
+        return self._screen._instance.content.allows_handle(
+            self._content.handle, Verb.READ, caller
+        )
 
     def open(self, caller) -> Window:
         """Divak si otevrel okno z nabidky.
@@ -119,8 +130,14 @@ class OfferCollection:
     def visible_to(self, caller) -> tuple[Offer, ...]:
         """Nabidky, ktere tenhle divak uvidi.
 
-        Zadnou novou plochu prav to nepridava: nabidku uvidi ten, kdo vidi
-        PLOCHU I APKU.
+        Rozhoduje PLOCHA a OBSAH - apka ne (D-60). Registrace apky je jen
+        deklarace "tenhle kod existuje"; treti ACL nezaviralo nic, co ty dve
+        nezavrou taky.
+
+        Nabidka pripnuta k obsahu, na ktery divak nema, se NEUKAZE. Je to ten
+        rozdil, ktery dela cely model: tataz nabidka na tez plose se dvema
+        lidem chova jinak, protoze rozhodl obsah. A polozit dokument na
+        verejnou plochu ho tim nezverejni.
         """
         from ..core.access import Verb, allowed
 
@@ -130,12 +147,7 @@ class OfferCollection:
         ):
             return ()
         return tuple(
-            offer
-            for offer in self._offers
-            if allowed(
-                caller.principals,
-                instance.objects.resolve(offer.app.address, Verb.READ),
-            )
+            offer for offer in self._offers if offer._readable_by(caller)
         )
 
     def __len__(self) -> int:
@@ -221,11 +233,12 @@ class WindowCollection:
 
         if handle is None:
             if scope == "explicit":
-                raise ValueError(
-                    f"apka {app!r} ma scope 'explicit' - obsah zaklada nekdo jiny, "
-                    f"takze se okno musi otevrit s handle=..."
-                )
-            handle = instance.content.handle_for(app, scope, address)
+                # Nabidka bez obsahu u `explicit`: dokument vznikne az
+                # kliknutim a patri tomu, kdo klikl. Kazde kliknuti je novy
+                # dokument - proto se rukojet razi cerstva, ne odvozuje.
+                handle = instance.content.mint(f"new:{app}:{new_id()}")
+            else:
+                handle = instance.content.handle_for(app, scope, address)
 
         if handle is not None or scope not in ("session", "user"):
             handle, _ = instance.content.attach(

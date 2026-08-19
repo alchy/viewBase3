@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 from ..core.access import Verb, allowed
 from ..core.addressing import Address
 from ..core.identity import Caller
-from .access_facade import AccessFacade
 from .content import SCOPES, ContentRegistry
 from .events import Needs
 
@@ -90,7 +89,6 @@ class AppRegistration:
     #: renderer, urcoval by si klient vlastni autorizaci (chyby 3.1 a 3.2).
     menu: dict = field(default_factory=dict)
     _content: ContentRegistry | None = field(default=None, repr=False, compare=False)
-    access: AccessFacade | None = field(default=None, repr=False, compare=False)
     content: object = field(default=None, repr=False, compare=False)
     instance: object = field(default=None, repr=False, compare=False)
 
@@ -137,13 +135,20 @@ class AppCollection:
         self._instance = instance
         self._content = instance.content
 
-    def register(self, app, *, access=None, **overrides) -> AppRegistration:
+    def register(self, app) -> AppRegistration:
         """Zapis apku podle jejiho MANIFESTU.
 
-        CO JE V MANIFESTU, SE V KODU NEPISE ZNOVU (D-53): `app_id`, `kind`
-        i `scope` se vezmou odtamtud. Kdyby se opakovaly ve volani, daly by se
-        rozejit - a rozejity manifest znamena apku, ktera se chova jinak, nez
-        o sobe tvrdi.
+        CO JE V MANIFESTU, SE V KODU NEPISE ZNOVU (D-53) a NEJDE TO PREBIT
+        (D-63): `app_id`, `kind` i `scope` se vezmou odtamtud a zadny kwarg je
+        nezastini. Druhe misto, kde zije tataz hodnota, je tvar nalezu 3.8 -
+        a rozejde se nejtiseji: manifest rika jedno, provoz bezi podle druheho
+        a v logu je videt to prvni.
+
+        REGISTRACE NEBERE ANI READ, ANI WRITE (D-60). Apka je jen deklarace
+        "tenhle kod existuje a umi tenhle kind"; kdo ji uvidi, rozhoduje
+        PLOCHA a NABIDKA na ni. Treti ACL nezaviralo nic, co ty dve nezavrou
+        taky, a globalni vypinac existuje i bez nej - odregistrovana apka bere
+        sve nabidky s sebou.
 
         Vsechno se overuje TED, ne az za behu: chybejici nebo neudelitelna
         deklarace je chyba registrace, takze se rozhodnuti presune na misto,
@@ -155,7 +160,7 @@ class AppCollection:
                 f"{type(app).__name__} nema manifest; apka o sobe musi rict "
                 f"app_id, kind a scope"
             )
-        declared = {**manifest, **overrides}
+        declared = manifest
         app_id = declared.get("app_id")
         if not app_id:
             raise ValueError(f"manifest {type(app).__name__} neuvadi 'app_id'")
@@ -171,7 +176,6 @@ class AppCollection:
             groups_of_interest=tuple(declared.get("groups_of_interest", ())),
             menu_group=declared.get("menu_group"),
             menu=declared.get("menu"),
-            access=access,
         )
 
     def _register(
@@ -187,7 +191,6 @@ class AppCollection:
         groups_of_interest: tuple[str, ...] = (),
         menu_group: str | None = None,
         menu: dict | None = None,
-        access=None,
     ) -> AppRegistration:
         if app_id in self._registrations:
             raise ValueError(f"apka uz je registrovana: {app_id!r}")
@@ -213,13 +216,14 @@ class AppCollection:
             for name, spec in menu.items()
         ]
 
+        # Adresa apky zustava - loguje se na ni a odkazuje ji `audience`
+        # tokenu - ale PRAVA NENESE (D-60).
         address = Address.app(app_id)
-        self._instance.objects.add(address, access)
+        self._instance.objects.add(address)
         registration = AppRegistration(
             app_id, kind, scope, backend_base_url, granted, refused,
             tuple(groups_of_interest), menu_group, menu,
-            self._content, AccessFacade(self._instance, address),
-            None, self._instance,
+            self._content, None, self._instance,
         )
         object.__setattr__(
             registration, "content", ContentCollection(registration, self._instance)
@@ -234,21 +238,6 @@ class AppCollection:
         self._registrations.pop(app_id, None)
         self._instance.objects.remove(Address.app(app_id))
 
-    def visible_to(self, caller: Caller) -> tuple[AppRegistration, ...]:
-        """Apky, ktere tenhle divak vubec uvidi (D-36).
-
-        Spoustec je vec WORKBENCHE: stavi ho z registru a filtruje nasim
-        modelem. Apka do nej nevklada nic - jinak by mela nastroj, jak si
-        pridat cokoli komukoli do listy.
-        """
-        return tuple(
-            registration
-            for registration in self._registrations.values()
-            if allowed(
-                caller.principals,
-                self._instance.objects.resolve(registration.address, Verb.READ),
-            )
-        )
 
     # -- overeni deklaraci pri registraci --------------------------------
 

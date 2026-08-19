@@ -52,15 +52,28 @@ class ScreenCollection:
         *,
         id: str | None = None,
         title: str | None = None,
-        access: Access | None = None,
+        read=None,
+        write=None,
+        require_authentication: bool = False,
     ) -> Screen:
+        """Otevri plochu.
+
+        ACL se zadava rovnou pri vzniku - tyz tvar jako u nabidky, aby se
+        `read`/`write` psalo vsude stejne. Nezadane sloveso se dedi (u plochy
+        z vychozi hodnoty instance).
+        """
         instance = self._instance
+        access = Access(
+            read=Acl.from_iterable(read) if read is not None else None,
+            write=Acl.from_iterable(write) if write is not None else None,
+            step_up=require_authentication,
+        )
         screen_id = id if id is not None else new_id()
         address = Address.screen(screen_id)
         if address in instance.objects:
             raise ValueError(f"plocha uz existuje: {screen_id!r}")
 
-        instance.objects.add(address, access if access is not None else Access())
+        instance.objects.add(address, access)
         screen = Screen(instance, address, title, index=len(instance._screens))
         instance._screens[screen_id] = screen
         return screen
@@ -250,6 +263,24 @@ class Instance:
                 "access", "unknown_principal", address, None,
                 f"{name} neni znam zdroji identit - preklep?", level="warning",
             )
+
+    def serve(self, *args, **kwargs):
+        """Obsad port, otevri WebSocket a rozjed vysilaci smycku (D-55).
+
+        JESTE NEEXISTUJE. Metoda tu presto je, a schvalne: dokumentovany
+        skript ji obsahuje, takze kdyby chybela, spadl by na AttributeError -
+        a to je doslova nalez 3.11 z viewBase2 ("dokumentovany zapis v kodu
+        neexistoval"). Vyjimka s duvodem je greppable mezera; AttributeError
+        je preklep.
+
+        Prazdna metoda, ktera se tvari, ze neco spustila, by byla horsi nez
+        obojí.
+        """
+        raise NotImplementedError(
+            "transport jeste neni hotovy (D-55): serve() ma obsadit port, "
+            "otevrit WebSocket a rozjet vysilaci smycku. Model, prava a "
+            "deklarace prostredi funguji uz ted - viz testy."
+        )
 
     def _record_from_content(
         self, component: str, action: str, detail: str = "", security: bool = False

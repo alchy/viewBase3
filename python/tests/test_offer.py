@@ -98,14 +98,52 @@ def test_a_manifest_naming_an_unknown_kind_is_refused():
 # ===========================================================================
 
 
-def test_the_documented_six_line_script_runs():
-    # architektura-navrh.md, dodatek - doslova, jen bez serve().
-    inst = vb.Instance(default_access=["group:users"])
-    graf = inst.app.register(GraphApp())
-    provoz = inst.screen.open(title="Provoz")
-    provoz.app.register(graf, title="Sit")
+def test_the_documented_script_runs_verbatim():
+    """architektura-navrh.md, dodatek - doslova vcetne prefixu (D-64).
 
-    assert provoz.window.all() == ()  # pri startu neexistuje zadne okno
+    Pet radku, zadna id (pridelí se), zadna ACL (dedi se), zadna rukojet
+    (obsah vznikne s nabidkou). To je meritko, jestli je API jednoduche.
+    """
+    inst       = vb.Instance(default_access=["group:users"])
+    app_excel  = inst.app.register(GraphApp())      # app_id, kind i scope z manifestu
+    scr_provoz = inst.screen.open(title="Provoz")
+    scr_provoz.app.register(app_excel, title="Sesit")   # nabidni ji na tehle plose
+
+    assert scr_provoz.window.all() == ()  # pri startu neexistuje zadne okno
+
+    # Posledni radek skriptu. Transport jeste neni (D-55), takze serve()
+    # rekne PROC - kdyby chybel, spadl by dokumentovany skript na
+    # AttributeError a to je doslova nalez 3.11. Az prijde transport, tenhle
+    # test se otoci.
+    with pytest.raises(NotImplementedError, match="transport"):
+        inst.serve()
+
+
+def test_serve_exists_even_though_it_does_not_work_yet():
+    # Greppable mezera je lepsi nez chybejici metoda: AttributeError vypada
+    # jako preklep, NotImplementedError s duvodem vypada jako plan.
+    assert callable(vb.Instance().serve)
+
+
+def test_the_public_package_offers_no_way_to_open_a_window():
+    # D-61: kazde okno vznika z nabidky. Kdyby vedle toho existoval verejny
+    # symbol, ktery okno vyrobi, byly by dve cesty - a jedna ze dvou se drive
+    # nebo pozdeji prestane kontrolovat (presne tak vznikl nalez 3.1).
+    import types
+
+    # Balicek nacita verejna jmena lene, takze `vars` je zpocatku prazdne;
+    # ptame se proto na to, co NEMA byt uvnitr.
+    verejne = {
+        name for name, value in vars(vb).items()
+        if not name.startswith("_") and not isinstance(value, types.ModuleType)
+    }
+    assert verejne - set(vb.__all__) == set()
+    assert not any("window" in name.lower() for name in vb.__all__)
+    assert not any("open" in name.lower() for name in vb.__all__)
+
+    _, graf, provoz = prepared()
+    assert not hasattr(provoz.window, "open")
+    assert not hasattr(provoz, "open_window")
 
 
 def test_no_window_exists_before_a_viewer_opens_one():
@@ -177,13 +215,23 @@ def test_a_viewer_who_cannot_read_the_screen_gets_no_offer():
     assert provoz.app.visible_to(Caller.for_user("petr")) == ()
 
 
-def test_a_viewer_who_cannot_read_the_app_gets_no_offer():
-    # Nabidku uvidi ten, kdo vidi plochu I apku - zadnou novou plochu prav to
-    # nepridava.
+def test_a_viewer_who_cannot_read_the_content_gets_no_offer():
+    # Nabidku zavira PLOCHA a OBSAH, apka ne (D-60). Tohle je ten rozdil,
+    # ktery dela cely model: tataz nabidka na tez plose se dvema lidem chova
+    # jinak, protoze rozhodl obsah.
     instance, graf, provoz = prepared()
-    graf.access.read.set(["group:ucetni"])
-    provoz.app.register(graf, title="Sit")
+    cnt = graf.content.open(name="Mzdy", read=["group:ucetni"])
+    provoz.app.register(graf, title="Mzdy", content=cnt)
+
     assert provoz.app.visible_to(Caller.for_user("petr")) == ()
+    assert len(provoz.app.visible_to(Caller.for_user("hana", ["ucetni"]))) == 1
+
+
+def test_an_offer_without_content_asks_nobody():
+    # Obsah vznikne az kliknutim, takze neni na co se ptat.
+    instance, graf, provoz = prepared()
+    provoz.app.register(graf, title="Novy")
+    assert len(provoz.app.visible_to(Caller.for_user("petr"))) == 1
 
 
 # ===========================================================================

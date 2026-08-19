@@ -16,7 +16,7 @@ from __future__ import annotations
 
 
 def register_app(instance, app_id, *, kind="panel", scope="window", backend=None,
-                 access=None, **manifest):
+                 **manifest):
     """Zaregistruj apku popsanou rovnou tady, ne manifestem na objektu.
 
     Pravidlo "co je v manifestu, se v kodu nepise znovu" (D-53) ma vlastni
@@ -26,7 +26,7 @@ def register_app(instance, app_id, *, kind="panel", scope="window", backend=None
     if backend is None:
         backend = _Nic()
     return instance.app._register(
-        app_id, kind=kind, scope=scope, backend=backend, access=access, **manifest
+        app_id, kind=kind, scope=scope, backend=backend, **manifest
     )
 
 
