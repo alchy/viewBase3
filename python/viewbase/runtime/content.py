@@ -133,11 +133,16 @@ class ContentRegistry:
         secret: bytes,
         timeouts: dict[str, float] | None = None,
         audit: Callable[..., None] | None = None,
+        owner=None,
     ) -> None:
+        self._owner = owner
         self._secret = secret
         self._timeouts = {**DEFAULT_TIMEOUTS, **(timeouts or {})}
         self._audit = audit or (lambda *a, **k: None)
         self._contents: dict[str, Content] = {}
+        #: Okno -> rukojet. Opacny smer nez `Content.views`; potrebuje ho
+        #: vynucovani, aby se pri udalosti na okno dalo doptat na obsah.
+        self._by_view: dict[Address, str] = {}
         self._backends: dict[str, AppBackend] = {}
         self._pending_view: dict = {}
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="viewbase-app")
@@ -187,6 +192,40 @@ class ContentRegistry:
         content = self._contents.get(handle) if handle else None
         return {} if content is None else dict(content.view_defaults)
 
+    def address_of(self, window: Address) -> str | None:
+        """Kterym obsahem je tohle okno krmene, nebo None."""
+        return self._by_view.get(window)
+
+    def access(self, handle: str):
+        """Fasada nad ACL obsahu. Zapis vede pres instanci a audituje se."""
+        from .access_facade import AccessFacade
+
+        if handle not in self._contents:
+            raise KeyError(handle)
+        return AccessFacade(self._owner, Address.content(handle))
+
+    def allows(self, window: Address, verb, caller) -> bool:
+        """Pousti obsah tohohle okna dany volajici na dane sloveso?
+
+        DRUHA UROVEN SE PLATI, JEN KDYZ SE POUZIJE (D-57): kdyz obsah zadne
+        ACL nema - nebo okno zadny obsah nema - neomezuje nic. Nenastavene ACL
+        obsahu tedy neni vychozi hodnota, ale "druha uroven se nepouzila".
+
+        Zamerne se NEPTAME pres `resolve`: ten dela dedicnost a obsah zadnou
+        nema. Kdyby se to poculo pres nej, potreboval by treti chovani vychozi
+        hodnoty - a takovy prirustek by musel pojmenovat konkretni chybu,
+        kterou zavira (par. 1, sesty princip).
+        """
+        from ..core.access import allowed
+
+        handle = self._by_view.get(window)
+        if handle is None:
+            return True
+        acl = self._owner.objects.access_of(Address.content(handle)).for_verb(verb)
+        if acl is None:
+            return True
+        return allowed(caller.principals, acl)
+
     def created_by(self, handle: str) -> str | None:
         content = self._contents.get(handle)
         return None if content is None else content.created_by
@@ -219,6 +258,7 @@ class ContentRegistry:
         if content:
             if address is not None:
                 content.views.add(address)
+                self._by_view[address] = handle
             return handle, content.state
 
         self._pending_view = {}
@@ -235,8 +275,12 @@ class ContentRegistry:
             )
             self._contents[minted] = content
         content.state = state
+        if self._owner is not None and Address.content(minted) not in self._owner.objects:
+            # Obsah je objekt jako kazdy jiny: ma adresu a smi mit ACL (D-52).
+            self._owner.objects.add(Address.content(minted))
         if address is not None:
             content.views.add(address)
+            self._by_view[address] = minted
         return minted, state
 
     def detach(self, handle: str, address: Address) -> None:
@@ -247,11 +291,15 @@ class ContentRegistry:
         content = self._contents.get(handle)
         if content is not None:
             content.views.discard(address)
+        self._by_view.pop(address, None)
 
     def close(self, handle: str) -> None:
         content = self._contents.pop(handle, None)
         if content is None:
             return
+        self._by_view = {a: h for a, h in self._by_view.items() if h != handle}
+        if self._owner is not None:
+            self._owner.objects.remove(Address.content(handle))
         backend = self._backends.get(content.app_id)
         if backend is not None:
             self._call(content, "close_content", backend.close_content, handle)

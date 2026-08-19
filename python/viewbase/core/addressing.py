@@ -15,6 +15,7 @@ Tvary adres:
     instance:                       sama instance (vlastni ACL, sprava)
     instance:<jmeno>                objekt instance (log, audit)
     app:<app_id>                    registrace apky (kdo ji vubec uvidi)
+    content:<rukojet>               obsah u apky (druha uroven prav)
     screen:<id>                     plocha
     screen:<id>/window:<id>         okno na plose
 
@@ -38,7 +39,7 @@ _ID_BYTES = 9
 
 #: Co smi stat pod cim. Adresa mimo tenhle strom je chyba, ne novy tvar.
 _ALLOWED_CHILDREN = {"screen": ("window",)}
-_ALLOWED_ROOTS = ("instance", "screen", "app")
+_ALLOWED_ROOTS = ("instance", "screen", "app", "content")
 
 
 def new_id() -> str:
@@ -98,6 +99,16 @@ class Address:
         plochu - existuje driv, nez je jake okno.
         """
         return cls((("app", _validate(app_id, "id apky")),))
+
+    @classmethod
+    def content(cls, handle: str) -> "Address":
+        """Obsah u apky.
+
+        Ma vlastni ACL a NEMA DEDICNOST (D-57): nelezi na plose, takze neni
+        z ceho dedit. Efektivni pravo divaka je prunik okna a obsahu a pocita
+        se vyslovne, ne tretim pravidlem v dedicnosti.
+        """
+        return cls((("content", _validate(handle, "rukojet obsahu")),))
 
     @classmethod
     def screen(cls, screen_id: str) -> "Address":

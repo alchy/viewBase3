@@ -133,7 +133,7 @@ class Instance:
             else new_id().encode("utf-8")
         )
         self.content = ContentRegistry(
-            self._secret, app_timeouts, audit=self._record_from_content
+            self._secret, app_timeouts, audit=self._record_from_content, owner=self
         )
         #: Co tahle instance vubec umi udelit. Rozhoduje se pri REGISTRACI
         #: apky, ne za behu v cizim prohlizeci (D-40).
@@ -144,7 +144,10 @@ class Instance:
         self.app = AppCollection(self)
         #: Jedine autentizacni API pro apky - autor apky ho nevymysli (D-47).
         self.auth = AuthService(self, clock)
-        self.guard = Guard(events=self.events, objects=self.objects, grants=self.grants)
+        self.guard = Guard(
+            events=self.events, objects=self.objects, grants=self.grants,
+            contents=self.content,
+        )
 
     # -- jedina cesta ke zmene prav (D-14) -------------------------------
 

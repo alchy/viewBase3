@@ -74,6 +74,7 @@ class Verdict(Enum):
     SCREEN_CLOSED = "screen_closed"  # brana plochy neprosla
     NOT_IN_ACL = "not_in_acl"  # ACL objektu neprolo
     NO_GRANT = "no_grant"  # chybi krok navic k teto dvojici
+    CONTENT_CLOSED = "content_closed"  # okno pousti, obsah ne (druha uroven)
     INSTANCE_CLOSED = "instance_closed"  # sprava instance je zavrena
 
 
@@ -157,6 +158,9 @@ class Guard:
     events: EventRegistry
     objects: ObjectRegistry
     grants: Grants
+    #: Druha uroven prav. `None` znamena "zadny obsah neni" - typicky v testech
+    #: jadra, ktere zadnou apku nemaji.
+    contents: object | None = None
 
     def check(
         self, caller: Caller, event: str, target: Address | None = None
@@ -224,6 +228,18 @@ class Guard:
             caller.principals, self.objects.resolve(target, Verb.WRITE)
         ):
             return Decision(Verdict.NOT_IN_ACL)
+
+        # 3. A teprve pak DRUHA UROVEN: obsah, kterym je okno krmene (D-57).
+        #    Pocita se VYSLOVNE, ne tretim pravidlem v dedicnosti, a plati se
+        #    jen kdyz se pouzije - obsah bez ACL neomezuje nic.
+        #    Vlastni duvod zamerne: "na okno nemas" a "na obsah nemas" jsou
+        #    pri hledani chyby dve uplne jine veci (par. 8, chyba 3.7).
+        if self.contents is not None:
+            wanted = Verb.WRITE if needs is Needs.WRITE else Verb.READ
+            if not self.contents.allows(target, Verb.READ, caller):
+                return Decision(Verdict.CONTENT_CLOSED)
+            if not self.contents.allows(target, wanted, caller):
+                return Decision(Verdict.CONTENT_CLOSED)
         return Decision(Verdict.OK)
 
     def _check_step_up(
