@@ -17,6 +17,7 @@ import pytest
 
 import viewbase as vb
 from viewbase.core.identity import Caller
+from conftest import open_window, register_app
 
 
 class FakeApp:
@@ -48,12 +49,11 @@ MENU = {
 
 def prepared(menu=None, group="Hello", backend=None, **kwargs):
     instance = vb.Instance(**kwargs)
-    instance.app.register(
-        "example.hello", kind="graph", scope="app", backend=backend or FakeApp(),
+    register_app(instance, "example.hello", kind="graph", scope="app", backend=backend or FakeApp(),
         menu_group=group, menu=menu if menu is not None else dict(MENU),
     )
     screen = instance.screen.open(id="infra")
-    window = screen.window.open("graph", id="net", app="example.hello")
+    window = open_window(screen, "graph", id="net", app="example.hello")
     return instance, screen, window
 
 
@@ -85,7 +85,7 @@ def test_the_app_group_is_named_from_the_registration():
 
 def test_a_window_without_an_app_has_only_the_view_group():
     instance = vb.Instance()
-    window = instance.screen.open(id="infra").window.open("graph", id="net")
+    window = open_window(instance.screen.open(id="infra"), "graph", id="net")
     assert groups(window.menu_for(Caller.for_user("hana"))) == ["View"]
 
 
@@ -98,7 +98,7 @@ def test_an_app_without_menu_items_shows_no_group_of_its_own():
 def test_a_renderer_without_view_options_shows_no_view_group():
     instance = vb.Instance()
     instance.renderer.register("holy", contract="holy.v1")
-    window = instance.screen.open(id="infra").window.open("holy", id="w")
+    window = open_window(instance.screen.open(id="infra"), "holy", id="w")
     assert groups(window.menu_for(Caller.for_user("hana"))) == []
 
 
@@ -225,8 +225,7 @@ DESTRUCTIVE = {
 def test_a_destructive_item_needs_at_least_write():
     instance = vb.Instance()
     with pytest.raises(ValueError, match="destructive"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             menu={"wipe": {"type": "command", "needs": "read", "destructive": True}},
         )
 
@@ -235,13 +234,12 @@ def test_a_destructive_item_is_for_the_owner_of_the_content():
     # Jeden obsah muze byt ve dvou oknech s ruznymi ACL: pravo psat v jednom
     # okne nesmi znamenat pravo znicit obsah videny v druhem.
     instance = vb.Instance()
-    instance.app.register(
-        "example.hello", kind="graph", scope="app", backend=FakeApp(),
+    register_app(instance, "example.hello", kind="graph", scope="app", backend=FakeApp(),
         menu_group="Hello", menu=dict(DESTRUCTIVE),
     )
     screen = instance.screen.open(id="infra")
     screen.access.write.set(["group:users"])
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="example.hello", by=Caller.for_user("hana")
     )
     window.access.write.set(["group:users"])
@@ -252,12 +250,11 @@ def test_a_destructive_item_is_for_the_owner_of_the_content():
 
 def test_the_administrator_may_use_a_destructive_item_on_a_foreign_content():
     instance = vb.Instance()
-    instance.app.register(
-        "example.hello", kind="graph", scope="app", backend=FakeApp(),
+    register_app(instance, "example.hello", kind="graph", scope="app", backend=FakeApp(),
         menu_group="Hello", menu=dict(DESTRUCTIVE),
     )
     screen = instance.screen.open(id="infra")
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="example.hello", by=Caller.for_user("hana")
     )
     admin = Caller.for_user("spravce", ["administrator"])
@@ -272,8 +269,7 @@ def test_the_administrator_may_use_a_destructive_item_on_a_foreign_content():
 def test_a_menu_item_without_needs_fails_the_registration():
     instance = vb.Instance()
     with pytest.raises(ValueError, match="needs"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             menu={"neco": {"type": "command"}},
         )
 
@@ -281,8 +277,7 @@ def test_a_menu_item_without_needs_fails_the_registration():
 def test_a_menu_item_of_an_unknown_type_fails_the_registration():
     instance = vb.Instance()
     with pytest.raises(ValueError, match="type"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             menu={"neco": {"type": "posuvnik", "needs": "write"}},
         )
 
@@ -290,8 +285,7 @@ def test_a_menu_item_of_an_unknown_type_fails_the_registration():
 def test_a_choice_without_options_fails_the_registration():
     instance = vb.Instance()
     with pytest.raises(ValueError, match="options"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             menu={"mode": {"type": "choice", "needs": "write"}},
         )
 
@@ -299,8 +293,7 @@ def test_a_choice_without_options_fails_the_registration():
 def test_a_menu_without_a_group_name_fails_the_registration():
     instance = vb.Instance()
     with pytest.raises(ValueError, match="menu_group"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu=dict(MENU),
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu=dict(MENU),
         )
 
 
@@ -308,8 +301,7 @@ def test_a_group_name_that_would_not_fit_the_bar_fails_the_registration():
     # Strop delky: jmeno kresli workbench a lista neni nafukovaci.
     instance = vb.Instance()
     with pytest.raises(ValueError, match="menu_group"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(),
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(),
             menu_group="P" * 100, menu=dict(MENU),
         )
 
@@ -324,8 +316,7 @@ def test_a_menu_item_becomes_an_event_in_the_registry():
 def test_a_menu_item_cannot_collide_with_a_declared_event():
     instance = vb.Instance()
     with pytest.raises(ValueError):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             events={"submit": {"needs": "write", "profile": "request"}},
             menu={"submit": {"type": "command", "needs": "write"}},
         )
@@ -334,8 +325,7 @@ def test_a_menu_item_cannot_collide_with_a_declared_event():
 def test_a_failed_menu_declaration_leaves_no_app_behind():
     instance = vb.Instance()
     with pytest.raises(ValueError):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
+        register_app(instance, "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
             menu={"neco": {"type": "posuvnik", "needs": "write"}},
         )
     assert "x" not in instance.app

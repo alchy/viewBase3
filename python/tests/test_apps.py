@@ -8,6 +8,7 @@ from viewbase.core.access import Acl, Verb
 from viewbase.core.addressing import Address
 from viewbase.core.identity import ADMINISTRATOR, USERS, Caller
 from viewbase.runtime.content import ContentState
+from conftest import open_window, register_app
 
 
 class FakeApp:
@@ -47,8 +48,7 @@ class OpenApp(FakeApp):
 
 def instance_with(app=None, **kwargs):
     instance = vb.Instance(**kwargs)
-    instance.app.register(
-        "workbench.graph", kind="graph", scope="app", backend=app or OpenApp()
+    register_app(instance, "workbench.graph", kind="graph", scope="app", backend=app or OpenApp()
     )
     return instance
 
@@ -74,7 +74,7 @@ def test_the_launcher_shows_only_apps_the_viewer_may_read():
     # Spoustec je vec WORKBENCHE - stavi ho z registru apek a filtruje nasim
     # modelem. Apka do nej nic nevklada.
     instance = instance_with()
-    instance.app.register("tajna", kind="panel", scope="app", backend=OpenApp())
+    register_app(instance, "tajna", kind="panel", scope="app", backend=OpenApp())
     instance.app.get("tajna").access.read.set(["group:ucetni"])
 
     visible = {r.app_id for r in instance.app.visible_to(Caller.for_user("petr"))}
@@ -97,7 +97,7 @@ def test_the_administrator_sees_every_app():
 
 def test_an_anonymous_viewer_sees_no_app_by_default():
     instance = vb.Instance(default_access=[USERS])
-    instance.app.register("workbench.graph", kind="graph", scope="app", backend=OpenApp())
+    register_app(instance, "workbench.graph", kind="graph", scope="app", backend=OpenApp())
     assert instance.app.visible_to(Caller.anonymous()) == ()
 
 
@@ -117,16 +117,14 @@ def test_a_required_capability_that_cannot_be_granted_fails_the_registration():
     # misto do prohlizece ciziho cloveka.
     instance = vb.Instance(capabilities=["canvas2d"])
     with pytest.raises(ValueError, match="fetch-origin"):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=OpenApp(),
+        register_app(instance, "x", kind="graph", scope="app", backend=OpenApp(),
             capabilities={"required": ["fetch-origin"]},
         )
 
 
 def test_a_required_capability_that_can_be_granted_is_fine():
     instance = vb.Instance(capabilities=["canvas2d", "webgl"])
-    registration = instance.app.register(
-        "x", kind="graph", scope="app", backend=OpenApp(),
+    registration = register_app(instance, "x", kind="graph", scope="app", backend=OpenApp(),
         capabilities={"required": ["webgl"]},
     )
     assert registration.granted == ("webgl",)
@@ -136,8 +134,7 @@ def test_an_optional_capability_that_cannot_be_granted_leaves_the_app_running():
     # Apka bezi osekane a VI O TOM - neudelena schopnost je nepritomna,
     # ne chyba za behu.
     instance = vb.Instance(capabilities=["canvas2d"])
-    registration = instance.app.register(
-        "x", kind="graph", scope="app", backend=OpenApp(),
+    registration = register_app(instance, "x", kind="graph", scope="app", backend=OpenApp(),
         capabilities={"required": ["canvas2d"], "optional": ["webgl"]},
     )
     assert registration.granted == ("canvas2d",)
@@ -146,8 +143,7 @@ def test_an_optional_capability_that_cannot_be_granted_leaves_the_app_running():
 
 def test_a_refused_optional_capability_is_written_to_the_audit():
     instance = vb.Instance(capabilities=["canvas2d"])
-    instance.app.register(
-        "x", kind="graph", scope="app", backend=OpenApp(),
+    register_app(instance, "x", kind="graph", scope="app", backend=OpenApp(),
         capabilities={"optional": ["webgl"]},
     )
     assert any(r.action == "capability_refused" for r in instance.audit)
@@ -156,8 +152,7 @@ def test_a_refused_optional_capability_is_written_to_the_audit():
 def test_a_failed_registration_leaves_nothing_behind():
     instance = vb.Instance(capabilities=[])
     with pytest.raises(ValueError):
-        instance.app.register(
-            "x", kind="graph", scope="app", backend=OpenApp(),
+        register_app(instance, "x", kind="graph", scope="app", backend=OpenApp(),
             capabilities={"required": ["webgl"]},
         )
     assert "x" not in instance.app
@@ -171,8 +166,7 @@ def test_a_failed_registration_leaves_nothing_behind():
 
 def test_an_app_event_lands_in_the_event_registry():
     instance = vb.Instance()
-    instance.app.register(
-        "example.hello", kind="panel", scope="app", backend=OpenApp(),
+    register_app(instance, "example.hello", kind="panel", scope="app", backend=OpenApp(),
         events={"hello_submit": {"needs": "write", "profile": "request"}},
     )
     assert instance.events.get("example.hello.hello_submit") is not None
@@ -180,8 +174,7 @@ def test_an_app_event_lands_in_the_event_registry():
 
 def test_an_app_event_carries_the_needs_it_declared():
     instance = vb.Instance()
-    instance.app.register(
-        "example.hello", kind="panel", scope="app", backend=OpenApp(),
+    register_app(instance, "example.hello", kind="panel", scope="app", backend=OpenApp(),
         events={"hello_submit": {"needs": "write", "profile": "request"}},
     )
     assert instance.events.get("example.hello.hello_submit").needs is vb.Needs.WRITE
@@ -192,8 +185,7 @@ def test_an_app_event_without_needs_fails_the_registration():
     # udalosti apky obchazely registr (chyba 3.1).
     instance = vb.Instance()
     with pytest.raises(ValueError, match="needs"):
-        instance.app.register(
-            "example.hello", kind="panel", scope="app", backend=OpenApp(),
+        register_app(instance, "example.hello", kind="panel", scope="app", backend=OpenApp(),
             events={"hello_submit": {"profile": "request"}},
         )
 
@@ -202,7 +194,7 @@ def test_two_apps_can_declare_the_same_event_name():
     # Jmena se jmenuji podle apky, takze si dve apky nemohou prebit udalost.
     instance = vb.Instance()
     for app_id in ("prvni", "druha"):
-        instance.app.register(
+        register_app(instance,
             app_id, kind="panel", scope="app", backend=OpenApp(),
             events={"submit": {"needs": "write", "profile": "request"}},
         )
@@ -214,12 +206,11 @@ def test_an_app_event_obeys_the_registry_invariant():
     # Tyz strojovy test jako u vestavenych udalosti: anonym na skryte plose
     # nedosahne na handler.
     instance = vb.Instance(default_access=[])
-    instance.app.register(
-        "example.hello", kind="panel", scope="app", backend=OpenApp(),
+    register_app(instance, "example.hello", kind="panel", scope="app", backend=OpenApp(),
         events={"hello_submit": {"needs": "write", "profile": "request"}},
     )
     screen = instance.screen.open(id="tajna")
-    window = screen.window.open("panel", id="h")
+    window = open_window(screen, "panel", id="h")
     decision = instance.guard.check(
         Caller.anonymous(), "example.hello.hello_submit", window.address
     )
@@ -237,7 +228,7 @@ def test_an_app_event_obeys_the_registry_invariant():
 def test_open_content_gets_the_subject():
     backend = OpenApp()
     instance = instance_with(backend)
-    instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
+    open_window(instance.screen.open(id="infra"), "graph", id="net", app="workbench.graph")
     assert "subject_id" in backend.subjects[-1]
 
 
@@ -245,7 +236,7 @@ def test_the_app_may_mint_the_handle_itself():
     # Obsah muze vzniknout na apce driv, nez existuje jakekoli viewBase.
     backend = OpenApp()
     instance = vb.Instance()
-    instance.app.register("a", kind="graph", scope="explicit", backend=backend)
+    register_app(instance, "a", kind="graph", scope="explicit", backend=backend)
     handle = instance.app.get("a").new_content(mint_at_app=True)
     assert handle == "app_minted_1"
 
@@ -277,14 +268,14 @@ def test_the_app_contract_no_longer_lists_content():
 
 def test_content_records_who_created_it():
     instance = instance_with()
-    w = instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
+    w = open_window(instance.screen.open(id="infra"), "graph", id="net", app="workbench.graph")
     assert instance.content.created_by(w.app.handle) is not None
 
 
 def test_the_creator_is_the_caller_who_opened_it():
     instance = instance_with()
     screen = instance.screen.open(id="infra")
-    w = screen.window.open(
+    w = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     assert instance.content.created_by(w.app.handle) == "user:hana"
@@ -295,7 +286,7 @@ def test_a_destructive_action_is_for_the_founder_or_the_administrator():
     # spravce - odvozene, ne deklarovane. V ACL zadne 'manage' neni.
     instance = instance_with()
     screen = instance.screen.open(id="infra")
-    w = screen.window.open(
+    w = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     handle = w.app.handle

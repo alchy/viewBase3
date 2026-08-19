@@ -12,6 +12,7 @@ import pytest
 import viewbase as vb
 from viewbase.core.identity import Caller
 from viewbase.runtime.content import ContentState
+from conftest import open_window, register_app
 
 
 class FakeApp:
@@ -61,8 +62,7 @@ class SlowApp(FakeApp):
 
 def with_graph(scope="app", backend=None, **kwargs):
     instance = vb.Instance(**kwargs)
-    instance.app.register(
-        "workbench.graph", kind="graph", scope=scope, backend=backend or FakeApp()
+    register_app(instance, "workbench.graph", kind="graph", scope=scope, backend=backend or FakeApp()
     )
     return instance, instance.screen.open(id="infra")
 
@@ -74,14 +74,14 @@ def with_graph(scope="app", backend=None, **kwargs):
 
 def test_a_window_bound_to_an_app_gets_a_handle():
     _, screen = with_graph()
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     assert w.app.handle
 
 
 def test_the_handle_is_opaque():
     # Neuhodnutelna, aby neslo instance obsahu vyjmenovat.
     _, screen = with_graph()
-    handle = screen.window.open("graph", id="net", app="workbench.graph").app.handle
+    handle = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
     assert "net" not in handle
     assert "infra" not in handle
 
@@ -91,8 +91,8 @@ def test_documented_line_two_windows_one_content():
     instance, screen = with_graph()
     screen2 = instance.screen.open(id="druha")
 
-    w = screen.window.open("graph", id="net", app="workbench.graph")
-    w2 = screen2.window.open("graph", id="net2", app="workbench.graph",
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
+    w2 = open_window(screen2, "graph", id="net2", app="workbench.graph",
                              handle=w.app.handle)
 
     assert w2.app.handle == w.app.handle
@@ -103,7 +103,7 @@ def test_documented_line_content_without_a_window():
     # ho nekdo otevre.
     instance, screen = with_graph(scope="explicit")
     h = instance.app.get("workbench.graph").new_content()
-    w = screen.window.open("graph", id="net", app="workbench.graph", handle=h)
+    w = open_window(screen, "graph", id="net", app="workbench.graph", handle=h)
     assert w.app.handle == h
 
 
@@ -117,17 +117,17 @@ def test_content_created_without_a_window_is_opened_at_the_app():
 def test_two_instances_mint_different_handles_for_the_same_address():
     prvni, screen1 = with_graph()
     druha, screen2 = with_graph()
-    a = screen1.window.open("graph", id="net", app="workbench.graph").app.handle
-    b = screen2.window.open("graph", id="net", app="workbench.graph").app.handle
+    a = open_window(screen1, "graph", id="net", app="workbench.graph").app.handle
+    b = open_window(screen2, "graph", id="net", app="workbench.graph").app.handle
     assert a != b
 
 
 def test_a_handle_survives_reopening_the_same_window():
     # Retezec ulozeny v konfiguraci pred mesicem ma dal platit (D-29).
     instance, screen = with_graph(scope="window", secret="tajemstvi")
-    first = screen.window.open("graph", id="net", app="workbench.graph").app.handle
+    first = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
     screen.window.close("net")
-    second = screen.window.open("graph", id="net", app="workbench.graph").app.handle
+    second = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
     assert second == first
 
 
@@ -136,13 +136,13 @@ def test_two_instances_with_the_same_secret_agree_on_handles():
     # tajemstvi nastavit zvenci.
     def make():
         instance = vb.Instance(secret="tajemstvi")
-        instance.app.register("workbench.graph", kind="graph", scope="window",
+        register_app(instance, "workbench.graph", kind="graph", scope="window",
                               backend=FakeApp())
         return instance.screen.open(id="infra")
 
     assert (
-        make().window.open("graph", id="net", app="workbench.graph").app.handle
-        == make().window.open("graph", id="net", app="workbench.graph").app.handle
+        open_window(make(), "graph", id="net", app="workbench.graph").app.handle
+        == open_window(make(), "graph", id="net", app="workbench.graph").app.handle
     )
 
 
@@ -153,24 +153,24 @@ def test_two_instances_with_the_same_secret_agree_on_handles():
 
 def test_window_scope_gives_each_window_its_own_content():
     _, screen = with_graph(scope="window")
-    a = screen.window.open("graph", id="net", app="workbench.graph").app.handle
-    b = screen.window.open("graph", id="net2", app="workbench.graph").app.handle
+    a = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
+    b = open_window(screen, "graph", id="net2", app="workbench.graph").app.handle
     assert a != b
 
 
 def test_app_scope_gives_every_window_the_same_content():
     # Spolecna mapa site pro vsechny.
     _, screen = with_graph(scope="app")
-    a = screen.window.open("graph", id="net", app="workbench.graph").app.handle
-    b = screen.window.open("graph", id="net2", app="workbench.graph").app.handle
+    a = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
+    b = open_window(screen, "graph", id="net2", app="workbench.graph").app.handle
     assert a == b
 
 
 def test_instance_scope_is_one_stream_for_the_whole_instance():
     instance, screen = with_graph(scope="instance")
     druha = instance.screen.open(id="druha")
-    a = screen.window.open("graph", id="net", app="workbench.graph").app.handle
-    b = druha.window.open("graph", id="jiny", app="workbench.graph").app.handle
+    a = open_window(screen, "graph", id="net", app="workbench.graph").app.handle
+    b = open_window(druha, "graph", id="jiny", app="workbench.graph").app.handle
     assert a == b
 
 
@@ -180,7 +180,7 @@ def test_session_and_user_scopes_have_no_handle_at_open_time():
     # graf jedno okno do tehoz.
     for scope in ("session", "user"):
         _, screen = with_graph(scope=scope)
-        w = screen.window.open("graph", id="net", app="workbench.graph")
+        w = open_window(screen, "graph", id="net", app="workbench.graph")
         assert w.app.handle is None, scope
         assert w.app.scope == scope
 
@@ -188,13 +188,13 @@ def test_session_and_user_scopes_have_no_handle_at_open_time():
 def test_explicit_scope_demands_a_handle():
     _, screen = with_graph(scope="explicit")
     with pytest.raises(ValueError, match="handle"):
-        screen.window.open("graph", id="net", app="workbench.graph")
+        open_window(screen, "graph", id="net", app="workbench.graph")
 
 
 def test_an_unknown_scope_is_refused_at_registration():
     instance = vb.Instance()
     with pytest.raises(ValueError):
-        instance.app.register("x", kind="graph", scope="kdovico", backend=FakeApp())
+        register_app(instance, "x", kind="graph", scope="kdovico", backend=FakeApp())
 
 
 # ===========================================================================
@@ -204,8 +204,8 @@ def test_an_unknown_scope_is_refused_at_registration():
 
 def test_two_windows_on_one_content_keep_their_own_access():
     instance, screen = with_graph()
-    verejne = screen.window.open("graph", id="net", app="workbench.graph")
-    tajne = screen.window.open("graph", id="net2", app="workbench.graph")
+    verejne = open_window(screen, "graph", id="net", app="workbench.graph")
+    tajne = open_window(screen, "graph", id="net2", app="workbench.graph")
 
     verejne.access.read.set(["group:public"])
     tajne.access.read.set(["group:ucetni"])
@@ -220,14 +220,14 @@ def test_the_instance_knows_which_windows_look_at_a_content():
     # Delta z obsahu se rozesle pres vsechna okna, ktera na nej koukaji, a
     # kazde si ji prefiltruje samo.
     instance, screen = with_graph()
-    a = screen.window.open("graph", id="net", app="workbench.graph")
-    b = screen.window.open("graph", id="net2", app="workbench.graph")
+    a = open_window(screen, "graph", id="net", app="workbench.graph")
+    b = open_window(screen, "graph", id="net2", app="workbench.graph")
     assert set(instance.content.views(a.app.handle)) == {a.address, b.address}
 
 
 def test_closing_a_window_is_detaching_a_view_not_killing_the_content():
     instance, screen = with_graph()
-    a = screen.window.open("graph", id="net", app="workbench.graph")
+    a = open_window(screen, "graph", id="net", app="workbench.graph")
     handle = a.app.handle
     screen.window.close("net")
     assert instance.content.state(handle) is not None
@@ -237,7 +237,7 @@ def test_closing_a_window_is_detaching_a_view_not_killing_the_content():
 def test_closing_a_window_does_not_call_close_content():
     backend = FakeApp()
     _, screen = with_graph(backend=backend)
-    screen.window.open("graph", id="net", app="workbench.graph")
+    open_window(screen, "graph", id="net", app="workbench.graph")
     screen.window.close("net")
     assert backend.closed == []
 
@@ -258,15 +258,15 @@ def test_content_is_closed_only_when_someone_says_so():
 def test_opening_a_window_opens_the_content_at_the_app():
     backend = FakeApp()
     _, screen = with_graph(backend=backend)
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     assert backend.opened[0][0] == w.app.handle
 
 
 def test_a_second_view_does_not_open_the_content_twice():
     backend = FakeApp()
     _, screen = with_graph(backend=backend)
-    screen.window.open("graph", id="net", app="workbench.graph")
-    screen.window.open("graph", id="net2", app="workbench.graph")
+    open_window(screen, "graph", id="net", app="workbench.graph")
+    open_window(screen, "graph", id="net2", app="workbench.graph")
     assert len(backend.opened) == 1
 
 
@@ -274,7 +274,7 @@ def test_the_app_never_learns_about_screens_or_windows():
     # ZADNE screen ani window v API apky - mapu okno -> rukojet drzi instance.
     backend = FakeApp()
     _, screen = with_graph(backend=backend)
-    screen.window.open("graph", id="net", app="workbench.graph")
+    open_window(screen, "graph", id="net", app="workbench.graph")
     handle, spec = backend.opened[0]
     assert "screen" not in spec
     assert "window" not in spec
@@ -285,7 +285,7 @@ def test_the_subject_carries_no_session_id_and_no_groups():
     # kde se rozhoduje o pravech (review, vyhrada 2 a 4).
     backend = FakeApp()
     instance, screen = with_graph(backend=backend)
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     caller = Caller.for_user("hana", ["ucetni"], session="s1", correlation="c9f1")
 
     w.access.read.set(["group:users"])
@@ -302,7 +302,7 @@ def test_the_subject_carries_no_session_id_and_no_groups():
 def test_the_subject_says_who_it_is():
     backend = FakeApp()
     instance, screen = with_graph(backend=backend)
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     w.snapshot_for(Caller.for_user("hana", session="s1"))
     assert backend.subjects[-1]["subject_id"] == "user:hana"
 
@@ -310,7 +310,7 @@ def test_the_subject_says_who_it_is():
 def test_an_anonymous_caller_is_anonymous_to_the_app_too():
     backend = FakeApp()
     instance, screen = with_graph(backend=backend)
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     screen.access.read.set(["group:public"])
     w.access.read.set(["group:public"])
     w.snapshot_for(Caller.anonymous())
@@ -320,7 +320,7 @@ def test_an_anonymous_caller_is_anonymous_to_the_app_too():
 def test_the_snapshot_carries_a_cursor():
     # Bez kurzoru se delta bud ztrati, nebo pouzije dvakrat (D-31).
     instance, screen = with_graph(backend=FakeApp(cursor=271))
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     screen.access.read.set(["group:public"])
     w.access.read.set(["group:public"])
     assert w.snapshot_for(Caller.anonymous())["cursor"] == 271
@@ -333,36 +333,36 @@ def test_the_snapshot_carries_a_cursor():
 
 def test_a_healthy_app_leaves_the_content_ok():
     _, screen = with_graph()
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     assert w.content_state is ContentState.OK
 
 
 def test_a_broken_app_does_not_stop_the_window_from_opening():
     # Okno je ram s hlaskou "obsah neni dostupny"; instance neceka.
     _, screen = with_graph(backend=BrokenApp())
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     assert w.content_state is ContentState.UNAVAILABLE
 
 
 def test_a_broken_app_does_not_stop_the_other_windows():
     instance = vb.Instance()
-    instance.app.register("rozbita", kind="graph", scope="app", backend=BrokenApp())
-    instance.app.register("zdrava", kind="graph", scope="app", backend=FakeApp())
+    register_app(instance, "rozbita", kind="graph", scope="app", backend=BrokenApp())
+    register_app(instance, "zdrava", kind="graph", scope="app", backend=FakeApp())
     screen = instance.screen.open(id="infra")
 
-    screen.window.open("graph", id="a", app="rozbita")
-    zdrave = screen.window.open("graph", id="b", app="zdrava")
+    open_window(screen, "graph", id="a", app="rozbita")
+    zdrave = open_window(screen, "graph", id="b", app="zdrava")
     assert zdrave.content_state is ContentState.OK
 
 
 def test_a_slow_app_is_treated_like_an_unavailable_one():
     # Pomala apka smi zdrzet sebe, ne vysilaci smycku.
     instance = vb.Instance(app_timeouts={"open_content": 0.05})
-    instance.app.register("pomala", kind="graph", scope="app", backend=SlowApp())
+    register_app(instance, "pomala", kind="graph", scope="app", backend=SlowApp())
     screen = instance.screen.open(id="infra")
 
     started = time.monotonic()
-    w = screen.window.open("graph", id="net", app="pomala")
+    w = open_window(screen, "graph", id="net", app="pomala")
     elapsed = time.monotonic() - started
 
     assert w.content_state is ContentState.UNAVAILABLE
@@ -371,23 +371,23 @@ def test_a_slow_app_is_treated_like_an_unavailable_one():
 
 def test_an_unavailable_content_is_written_to_the_audit():
     instance = vb.Instance()
-    instance.app.register("rozbita", kind="graph", scope="app", backend=BrokenApp())
+    register_app(instance, "rozbita", kind="graph", scope="app", backend=BrokenApp())
     screen = instance.screen.open(id="infra")
-    screen.window.open("graph", id="net", app="rozbita")
+    open_window(screen, "graph", id="net", app="rozbita")
     assert any(record.action == "content_unavailable" for record in instance.audit)
 
 
 def test_a_window_without_an_app_is_never_unavailable():
     # Lokalni obsah dodava kod, ktery okno otevrel - nema co spadnout.
     instance = vb.Instance()
-    w = instance.screen.open(id="infra").window.open("panel", id="mzdy")
+    w = open_window(instance.screen.open(id="infra"), "panel", id="mzdy")
     assert w.content_state is ContentState.OK
 
 
 def test_asking_a_broken_app_for_a_snapshot_does_not_raise():
     # Vypadek je STAV OKNA, ne chyba: divak vidi ram, ostatni okna bezi dal.
     instance, screen = with_graph(backend=BrokenApp())
-    w = screen.window.open("graph", id="net", app="workbench.graph")
+    w = open_window(screen, "graph", id="net", app="workbench.graph")
     screen.access.read.set(["group:public"])
     w.access.read.set(["group:public"])
     assert w.snapshot_for(Caller.anonymous()) is None

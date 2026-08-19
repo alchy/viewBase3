@@ -14,14 +14,140 @@ privilegovanou cestu (typy-oken.md par. 3).
 """
 from __future__ import annotations
 
-from ..core.access import Access
+from ..core.access import Access, Acl
 from ..core.addressing import Address, new_id
 from .access_facade import AccessFacade, AccessOwner
 from .window import Window, WindowApp
 
 
+class Offer:
+    """Nabidka: "tuhle apku jde na tehle plose otevrit" (D-54).
+
+    Nabidka prezije vsechno - zavreni okna ji nerusi, prave proto, aby slo
+    otevrit znovu. Je to tyz vztah jako obsah vs. pohled, o patro vys:
+
+        nabidka  (deklaruje vyvojar)   prezije vsechno
+           | kliknuti
+        okno     (pohled)              vznika a zanika
+           |
+        obsah    (stav u apky)         zije podle scope
+
+    ACL se deklaruje TADY a okno, ktere z nabidky vznikne, ho zdedi.
+    """
+
+    __slots__ = ("_screen", "app", "title", "_access", "_content")
+
+    def __init__(self, screen, app, title, access, content) -> None:
+        self._screen = screen
+        self.app = app
+        self.title = title
+        self._access = access
+        self._content = content
+
+    @property
+    def id(self) -> str:
+        return self.app.app_id
+
+    def open(self, caller) -> Window:
+        """Divak si otevrel okno z nabidky.
+
+        Tohle je JEDINA cesta, jak okno vznikne. Kdyby vedle ni zustalo
+        `window.open` v deklaraci, byly by dve cesty - a jedna z nich by se
+        drive nebo pozdeji prestala kontrolovat.
+        """
+        return self._screen.window._create(
+            kind=self.app.kind,
+            title=self.title,
+            app=self.app.app_id,
+            handle=self._content.handle if self._content is not None else None,
+            access=self._access,
+            by=caller,
+        )
+
+    def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
+        return f"<Offer {self.app.app_id} on {self._screen.id} title={self.title!r}>"
+
+
+class OfferCollection:
+    """`screen.app` - co jde na tehle plose otevrit."""
+
+    __slots__ = ("_screen", "_offers")
+
+    def __init__(self, screen) -> None:
+        self._screen = screen
+        self._offers: list[Offer] = []
+
+    def register(
+        self,
+        app,
+        *,
+        title: str | None = None,
+        read=None,
+        write=None,
+        require_authentication: bool = False,
+        content=None,
+    ) -> Offer:
+        """Nabidni apku na tehle plose.
+
+        Nesaha se pritom na zadne okno, protoze zadne jeste neni. Bez
+        `content=` si obsah vyrobi nabidka sama pri otevreni a zadne vlastni
+        ACL nedostane - druha uroven se tim vubec nezapoji (D-59).
+        """
+        instance = self._screen._instance
+        if getattr(app, "instance", None) is not instance:
+            raise ValueError(
+                f"apka {getattr(app, 'app_id', app)!r} neni registrovana v teto instanci"
+            )
+        access = Access(
+            read=Acl.from_iterable(read) if read is not None else None,
+            write=Acl.from_iterable(write) if write is not None else None,
+            step_up=require_authentication,
+        )
+        offer = Offer(self._screen, app, title, access, content)
+        self._offers.append(offer)
+        return offer
+
+    def all(self) -> tuple[Offer, ...]:
+        return tuple(self._offers)
+
+    def get(self, app_id: str) -> Offer:
+        for offer in self._offers:
+            if offer.app.app_id == app_id:
+                return offer
+        raise KeyError(app_id)
+
+    def visible_to(self, caller) -> tuple[Offer, ...]:
+        """Nabidky, ktere tenhle divak uvidi.
+
+        Zadnou novou plochu prav to nepridava: nabidku uvidi ten, kdo vidi
+        PLOCHU I APKU.
+        """
+        from ..core.access import Verb, allowed
+
+        instance = self._screen._instance
+        if not allowed(
+            caller.principals, instance.objects.resolve(self._screen.address, Verb.READ)
+        ):
+            return ()
+        return tuple(
+            offer
+            for offer in self._offers
+            if allowed(
+                caller.principals,
+                instance.objects.resolve(offer.app.address, Verb.READ),
+            )
+        )
+
+    def __len__(self) -> int:
+        return len(self._offers)
+
+
 class WindowCollection:
-    """`screen.window` - okna jedne plochy.
+    """`screen.window` - okna jedne plochy ZA BEHU.
+
+    Otevirani tu neni: okno vznika tim, ze si ho divak otevre z nabidky
+    (`screen.app.register(...)`, pak `offer.open(caller)`). Zustava `get`,
+    `all` a `close`.
 
     Jednotne cislo je zamer: je to jmeno kolekce, ne seznam. Prochazeni je
     proto vyslovne `.all()`.
@@ -32,7 +158,7 @@ class WindowCollection:
     def __init__(self, screen: "Screen") -> None:
         self._screen = screen
 
-    def open(
+    def _create(
         self,
         kind: str,
         *,
@@ -43,7 +169,10 @@ class WindowCollection:
         by=None,
         access: Access | None = None,
     ) -> Window:
-        """Otevri okno daneho typu a volitelne ho spoj s apkou.
+        """Vyrob okno. Vola se JEN z nabidky (`Offer.open`).
+
+        Neni to verejna cesta: deklarace okna nevytvari, okno vznika az tim,
+        ze si ho divak otevre.
 
         `kind` je jmeno rendereru z naseho katalogu a overuje se HNED: apka
         JavaScript nedodava, takze neznamy `kind` je preklep a neni na co se
@@ -167,7 +296,8 @@ class Screen:
     vyrobi `screen_id=1` pro dve ruzne plochy (par. 2).
     """
 
-    __slots__ = ("_instance", "_windows", "address", "title", "index", "access", "window")
+    __slots__ = ("_instance", "_windows", "address", "title", "index", "access",
+                 "window", "app")
 
     def __init__(
         self, instance: AccessOwner, address: Address, title: str | None, index: int
@@ -179,6 +309,7 @@ class Screen:
         self.index = index
         self.access = AccessFacade(instance, address)
         self.window = WindowCollection(self)
+        self.app = OfferCollection(self)
 
     @property
     def id(self) -> str:

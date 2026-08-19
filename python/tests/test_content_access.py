@@ -21,6 +21,7 @@ from viewbase.core.access import Acl, Verb
 from viewbase.core.addressing import Address
 from viewbase.core.identity import USERS, Caller
 from viewbase.runtime.events import Needs, Verdict
+from conftest import open_window, register_app
 
 
 class FakeApp:
@@ -40,11 +41,11 @@ class FakeApp:
 def prepared(scope="app"):
     """Plocha i okno otevrene vsem prihlasenym; omezovat bude az obsah."""
     instance = vb.Instance(default_access=[USERS])
-    instance.app.register("workbench.graph", kind="graph", scope=scope, backend=FakeApp())
+    register_app(instance, "workbench.graph", kind="graph", scope=scope, backend=FakeApp())
     screen = instance.screen.open(id="infra")
     screen.access.read.set([USERS])
     screen.access.write.set([USERS])
-    window = screen.window.open("graph", id="net", app="workbench.graph")
+    window = open_window(screen, "graph", id="net", app="workbench.graph")
     window.access.read.set([USERS])
     window.access.write.set([USERS])
     return instance, screen, window
@@ -143,7 +144,7 @@ def test_content_does_not_inherit_the_instance_default():
 
 def test_the_same_content_in_two_windows_keeps_its_own_acl():
     instance, screen, window = prepared()
-    druhe = screen.window.open("graph", id="net2", app="workbench.graph")
+    druhe = open_window(screen, "graph", id="net2", app="workbench.graph")
     druhe.access.read.set([USERS])
     druhe.access.write.set([USERS])
     assert druhe.app.handle == window.app.handle
@@ -194,7 +195,7 @@ def test_an_event_passes_when_both_levels_allow():
 def test_a_window_without_content_is_not_stopped_by_the_second_level():
     instance = vb.Instance(default_access=[USERS])
     screen = instance.screen.open(id="infra")
-    window = screen.window.open("panel", id="mzdy")
+    window = open_window(screen, "panel", id="mzdy")
     instance.events.register("psani", lambda *a: None, needs=Needs.WRITE)
     assert instance.guard.check(Caller.for_user("hana"), "psani", window.address)
 
@@ -202,12 +203,11 @@ def test_a_window_without_content_is_not_stopped_by_the_second_level():
 def test_the_menu_obeys_the_content_too():
     # Menu se stavi pres tyz Guard, takze druha uroven se v nem projevi sama.
     instance = vb.Instance(default_access=[USERS])
-    instance.app.register(
-        "workbench.graph", kind="graph", scope="app", backend=FakeApp(),
+    register_app(instance, "workbench.graph", kind="graph", scope="app", backend=FakeApp(),
         menu_group="Graf", menu={"prekresli": {"type": "command", "needs": "write"}},
     )
     screen = instance.screen.open(id="infra")
-    window = screen.window.open("graph", id="net", app="workbench.graph")
+    window = open_window(screen, "graph", id="net", app="workbench.graph")
     instance.content.access(window.app.handle).write.set(["group:ucetni"])
 
     menu = window.menu_for(Caller.for_user("petr"))
@@ -230,8 +230,8 @@ def test_changing_the_content_acl_is_recorded():
 
 def test_the_change_survives_the_strictest_threshold():
     instance = vb.Instance(default_access=[USERS], log_level="error")
-    instance.app.register("a", kind="graph", scope="app", backend=FakeApp())
-    window = instance.screen.open(id="infra").window.open("graph", id="net", app="a")
+    register_app(instance, "a", kind="graph", scope="app", backend=FakeApp())
+    window = open_window(instance.screen.open(id="infra"), "graph", id="net", app="a")
     instance.content.access(window.app.handle).read.set(["group:ucetni"])
     assert any(r.action == "read" for r in instance.audit)
 

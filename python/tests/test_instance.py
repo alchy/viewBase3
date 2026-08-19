@@ -18,6 +18,7 @@ import viewbase as vb
 from viewbase.core.access import Acl, Verb
 from viewbase.core.addressing import Address
 from viewbase.core.identity import ADMINISTRATOR, USERS
+from conftest import open_window, register_app
 
 
 # ===========================================================================
@@ -84,7 +85,7 @@ def test_screen_opens_a_window_of_a_kind_given_as_a_value():
     # `open(kind, ...)`, ne `open_panel(...)`: jadro nesmi znat seznam typu.
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    window = screen.window.open("panel", id="mzdy", title="Mzdy")
+    window = open_window(screen, "panel", id="mzdy", title="Mzdy")
     assert window.kind == "panel"
     assert window.title == "Mzdy"
 
@@ -96,13 +97,13 @@ def test_a_kind_the_catalogue_does_not_know_is_refused():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
     with pytest.raises(ValueError):
-        screen.window.open("nekdo.jineho.mapa", id="m")
+        open_window(screen, "nekdo.jineho.mapa", id="m")
 
 
 def test_window_can_be_looked_up_and_closed():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    screen.window.open("panel", id="mzdy")
+    open_window(screen, "panel", id="mzdy")
     assert screen.window.get("mzdy").id == "mzdy"
     screen.window.close("mzdy")
     assert screen.window.all() == ()
@@ -113,7 +114,7 @@ def test_windows_are_listed_explicitly_not_by_iterating_the_collection():
     # k tomu, ze `screen.window` je seznam, a ono je to jmeno kolekce.
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    screen.window.open("panel", id="mzdy")
+    open_window(screen, "panel", id="mzdy")
     assert len(screen.window.all()) == 1
 
 
@@ -134,9 +135,9 @@ def test_two_screens_cannot_share_an_id():
 def test_two_windows_on_one_screen_cannot_share_an_id():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    screen.window.open("panel", id="mzdy")
+    open_window(screen, "panel", id="mzdy")
     with pytest.raises(ValueError):
-        screen.window.open("panel", id="mzdy")
+        open_window(screen, "panel", id="mzdy")
 
 
 def test_the_same_window_id_on_two_screens_is_fine():
@@ -144,8 +145,8 @@ def test_the_same_window_id_on_two_screens_is_fine():
     instance = vb.Instance()
     prvni = instance.screen.open(id="provoz")
     druha = instance.screen.open(id="sklad")
-    prvni.window.open("panel", id="mzdy")
-    assert druha.window.open("panel", id="mzdy").address != prvni.window.get("mzdy").address
+    open_window(prvni, "panel", id="mzdy")
+    assert open_window(druha, "panel", id="mzdy").address != prvni.window.get("mzdy").address
 
 
 # ===========================================================================
@@ -181,7 +182,7 @@ def test_order_on_the_bar_is_a_separate_property_from_the_id():
 def test_window_has_its_address_from_the_start():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    window = screen.window.open("panel", id="mzdy")
+    window = open_window(screen, "panel", id="mzdy")
     assert str(window.address) == "screen:provoz/window:mzdy"
 
 
@@ -190,14 +191,14 @@ def test_window_is_in_the_object_registry_immediately():
     # plocha prijala; do te doby melo prava "nikam nepatriciho" objektu.
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    window = screen.window.open("panel", id="mzdy")
+    window = open_window(screen, "panel", id="mzdy")
     assert window.address in instance.objects
 
 
 def test_closing_a_window_takes_it_out_of_the_registry():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    address = screen.window.open("panel", id="mzdy").address
+    address = open_window(screen, "panel", id="mzdy").address
     screen.window.close("mzdy")
     assert address not in instance.objects
 
@@ -245,7 +246,7 @@ def test_a_test_does_not_have_to_reset_anything():
 def prepared():
     instance = vb.Instance(default_access=["group:users"])
     screen = instance.screen.open(id="provoz")
-    window = screen.window.open("panel", id="mzdy", title="Mzdy")
+    window = open_window(screen, "panel", id="mzdy", title="Mzdy")
     return instance, screen, window
 
 
@@ -468,7 +469,7 @@ def test_an_unknown_principal_is_written_but_flagged():
     # pozdeji, treba v adresari.
     seen = {"group:ucetni"}
     instance = vb.Instance(knows_principal=lambda name: name in seen)
-    window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
+    window = open_window(instance.screen.open(id="provoz"), "panel", id="mzdy")
 
     window.access.read.set(["group:ucetnii"])  # preklep
 
@@ -478,7 +479,7 @@ def test_an_unknown_principal_is_written_but_flagged():
 
 def test_a_known_principal_raises_no_flag():
     instance = vb.Instance(knows_principal=lambda name: name == "group:ucetni")
-    window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
+    window = open_window(instance.screen.open(id="provoz"), "panel", id="mzdy")
     window.access.read.set(["group:ucetni"])
     assert not any(record.action == "unknown_principal" for record in instance.audit)
 
@@ -527,21 +528,21 @@ def test_the_administrator_gets_in_even_when_nobody_opened_it():
 
 def with_hello():
     instance = vb.Instance()
-    instance.app.register("example.hello", kind="panel")
+    register_app(instance, "example.hello", kind="panel")
     return instance, instance.screen.open(id="ahoj")
 
 
 def test_window_without_an_app_holds_content_locally():
     # Bez app= dodava obsah kod, ktery okno otevrel.
     instance = vb.Instance()
-    window = instance.screen.open(id="ahoj").window.open("panel", id="hello")
+    window = open_window(instance.screen.open(id="ahoj"), "panel", id="hello")
     assert window.app is None
 
 
 def test_documented_line_opening_a_window_bound_to_an_app():
     # typy-oken.md par. 2b, doslova.
     instance, screen = with_hello()
-    w = screen.window.open("panel", id="hello",
+    w = open_window(screen, "panel", id="hello",
                            title="Hello",
                            app="example.hello")
     assert w.app.id == "example.hello"
@@ -551,7 +552,7 @@ def test_the_binding_is_made_by_whoever_opens_the_window():
     # "Apka se na okno neprihlasuje sama. Kdyby mohla, byl by to zpusob, jak
     # se prilepit na cizi plochu."
     instance, screen = with_hello()
-    window = screen.window.open("panel", id="hello", app="example.hello")
+    window = open_window(screen, "panel", id="hello", app="example.hello")
     with pytest.raises(AttributeError):
         window.app = "nekdo.jiny"
     with pytest.raises(AttributeError):
@@ -574,13 +575,13 @@ def test_an_app_that_is_not_registered_fails_the_open_immediately():
     instance = vb.Instance()
     screen = instance.screen.open(id="ahoj")
     with pytest.raises(ValueError):
-        screen.window.open("panel", id="hello", app="example.helo")
+        open_window(screen, "panel", id="hello", app="example.helo")
 
 
 def test_the_failure_lists_what_is_registered_so_typos_are_obvious():
     instance, screen = with_hello()
     with pytest.raises(ValueError, match="example.hello"):
-        screen.window.open("panel", id="hello", app="example.helo")
+        open_window(screen, "panel", id="hello", app="example.helo")
 
 
 def test_a_failed_open_leaves_no_window_behind():
@@ -588,7 +589,7 @@ def test_a_failed_open_leaves_no_window_behind():
     # a nikdo by o nem nevedel.
     instance, screen = with_hello()
     with pytest.raises(ValueError):
-        screen.window.open("panel", id="hello", app="example.helo")
+        open_window(screen, "panel", id="hello", app="example.helo")
     assert screen.window.all() == ()
     assert Address.window("ahoj", "hello") not in instance.objects
 
@@ -598,7 +599,7 @@ def test_binding_an_app_to_a_window_of_a_different_kind_is_refused():
     # by jeji obsah nevykreslilo.
     instance, screen = with_hello()
     with pytest.raises(ValueError, match="panel"):
-        screen.window.open("graph", id="topologie", app="example.hello")
+        open_window(screen, "graph", id="topologie", app="example.hello")
 
 
 # -- registr apek ----------------------------------------------------------
@@ -612,7 +613,7 @@ def test_registered_apps_can_be_listed():
 def test_the_same_app_cannot_register_twice():
     instance, _ = with_hello()
     with pytest.raises(ValueError):
-        instance.app.register("example.hello", kind="panel")
+        register_app(instance, "example.hello", kind="panel")
 
 
 def test_two_instances_have_their_own_app_registries():
@@ -623,8 +624,7 @@ def test_two_instances_have_their_own_app_registries():
 
 def test_a_registration_keeps_what_the_document_declared():
     instance = vb.Instance()
-    instance.app.register(
-        "example.hello",
+    register_app(instance, "example.hello",
         kind="panel",
         scope="session",
         backend_base_url="http://hello-app:8080",

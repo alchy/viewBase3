@@ -31,6 +31,7 @@ from viewbase.core.audit import (
     sanitize,
 )
 from viewbase.runtime.audit import AuditLog
+from conftest import open_window, register_app
 
 
 # ===========================================================================
@@ -253,7 +254,7 @@ def instance_at(level):
 
     instance = vb.Instance(log_level=level)
     screen = instance.screen.open(id="provoz")
-    return instance, screen.window.open("panel", id="mzdy")
+    return instance, open_window(screen, "panel", id="mzdy")
 
 
 def test_a_change_of_rights_survives_the_strictest_threshold():
@@ -275,7 +276,7 @@ def test_an_ordinary_record_obeys_the_threshold():
     import viewbase as vb
 
     instance = vb.Instance(log_level="error", knows_principal=lambda name: False)
-    window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
+    window = open_window(instance.screen.open(id="provoz"), "panel", id="mzdy")
     window.access.read.set(["group:neznama"])
     assert not any(r.action == "unknown_principal" for r in instance.audit)
 
@@ -284,7 +285,7 @@ def test_the_same_record_passes_at_a_lower_threshold():
     import viewbase as vb
 
     instance = vb.Instance(log_level="info", knows_principal=lambda name: False)
-    window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
+    window = open_window(instance.screen.open(id="provoz"), "panel", id="mzdy")
     window.access.read.set(["group:neznama"])
     assert any(r.action == "unknown_principal" for r in instance.audit)
 
@@ -351,7 +352,7 @@ def test_an_unavailable_content_stays_an_ordinary_record():
             pass
 
     instance = vb.Instance(log_level="error")
-    instance.app.register("a", kind="graph", scope="app", backend=Spadla())
-    instance.screen.open(id="infra").window.open("graph", id="net", app="a")
+    register_app(instance, "a", kind="graph", scope="app", backend=Spadla())
+    open_window(instance.screen.open(id="infra"), "graph", id="net", app="a")
 
     assert not any(r.action == "content_unavailable" for r in instance.audit)

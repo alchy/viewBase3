@@ -29,6 +29,43 @@ MENU_ITEM_TYPES = ("command", "toggle", "choice")
 
 
 @dataclass(frozen=True, slots=True)
+class NamedContent:
+    """Obsah, ktery PREZIJE JEDNO OKNO (D-59).
+
+    Potreba jen ve trech pripadech - tyz obsah na dvou plochach, plneni
+    davkovou ulohou, jina prava na obsah nez na okno. V beznem pripade si
+    obsah vyrobi nabidka sama a tahle cesta se nepise vubec.
+    """
+
+    handle: str
+    name: str | None
+    access: object = field(default=None, repr=False, compare=False)
+
+
+class ContentCollection:
+    """`app.content` - pojmenovane obsahy jedne apky."""
+
+    __slots__ = ("_registration", "_instance")
+
+    def __init__(self, registration, instance) -> None:
+        self._registration = registration
+        self._instance = instance
+
+    def open(self, *, name: str | None = None, read=None, write=None,
+             spec: dict | None = None) -> NamedContent:
+        """Zaloz obsah, ktery existuje sam o sobe - jeste nez je jake okno."""
+        content = self._instance.content
+        handle = content.mint(f"named:{self._registration.app_id}:{new_handle_seed()}")
+        handle, _ = content.attach(handle, self._registration.app_id, None, spec or {})
+        facade = content.access(handle)
+        if read is not None:
+            facade.read.set(read)
+        if write is not None:
+            facade.write.set(write)
+        return NamedContent(handle=handle, name=name, access=facade)
+
+
+@dataclass(frozen=True, slots=True)
 class AppRegistration:
     """Co o sobe apka rekla pri registraci - a jak se s ni da mluvit.
 
@@ -54,6 +91,8 @@ class AppRegistration:
     menu: dict = field(default_factory=dict)
     _content: ContentRegistry | None = field(default=None, repr=False, compare=False)
     access: AccessFacade | None = field(default=None, repr=False, compare=False)
+    content: object = field(default=None, repr=False, compare=False)
+    instance: object = field(default=None, repr=False, compare=False)
 
     @property
     def address(self) -> Address:
@@ -98,7 +137,44 @@ class AppCollection:
         self._instance = instance
         self._content = instance.content
 
-    def register(
+    def register(self, app, *, access=None, **overrides) -> AppRegistration:
+        """Zapis apku podle jejiho MANIFESTU.
+
+        CO JE V MANIFESTU, SE V KODU NEPISE ZNOVU (D-53): `app_id`, `kind`
+        i `scope` se vezmou odtamtud. Kdyby se opakovaly ve volani, daly by se
+        rozejit - a rozejity manifest znamena apku, ktera se chova jinak, nez
+        o sobe tvrdi.
+
+        Vsechno se overuje TED, ne az za behu: chybejici nebo neudelitelna
+        deklarace je chyba registrace, takze se rozhodnuti presune na misto,
+        kde se da opravit (konfigurace), misto do prohlizece ciziho cloveka.
+        """
+        manifest = getattr(app, "manifest", None)
+        if not isinstance(manifest, dict):
+            raise ValueError(
+                f"{type(app).__name__} nema manifest; apka o sobe musi rict "
+                f"app_id, kind a scope"
+            )
+        declared = {**manifest, **overrides}
+        app_id = declared.get("app_id")
+        if not app_id:
+            raise ValueError(f"manifest {type(app).__name__} neuvadi 'app_id'")
+
+        return self._register(
+            app_id,
+            kind=declared.get("kind"),
+            scope=declared.get("scope", "window"),
+            backend=app,
+            backend_base_url=declared.get("backend_base_url"),
+            capabilities=declared.get("capabilities"),
+            events=declared.get("events"),
+            groups_of_interest=tuple(declared.get("groups_of_interest", ())),
+            menu_group=declared.get("menu_group"),
+            menu=declared.get("menu"),
+            access=access,
+        )
+
+    def _register(
         self,
         app_id: str,
         *,
@@ -113,12 +189,6 @@ class AppCollection:
         menu: dict | None = None,
         access=None,
     ) -> AppRegistration:
-        """Zapis apku. Vsechno se overuje TED, ne az za behu.
-
-        Chybejici nebo neudelitelna deklarace je chyba registrace: rozhodnuti
-        se tim presune na misto, kde se da opravit (konfigurace), misto do
-        prohlizece ciziho cloveka (D-40).
-        """
         if app_id in self._registrations:
             raise ValueError(f"apka uz je registrovana: {app_id!r}")
         if scope not in SCOPES:
@@ -149,6 +219,10 @@ class AppCollection:
             app_id, kind, scope, backend_base_url, granted, refused,
             tuple(groups_of_interest), menu_group, menu,
             self._content, AccessFacade(self._instance, address),
+            None, self._instance,
+        )
+        object.__setattr__(
+            registration, "content", ContentCollection(registration, self._instance)
         )
         self._registrations[app_id] = registration
         self._content.bind_backend(app_id, backend)

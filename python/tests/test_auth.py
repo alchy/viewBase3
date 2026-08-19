@@ -19,6 +19,7 @@ import pytest
 
 import viewbase as vb
 from viewbase.core.identity import Caller
+from conftest import register_app
 
 
 class FakeApp:
@@ -47,8 +48,7 @@ class Clock:
 
 def with_app(groups_of_interest=(), clock=None):
     instance = vb.Instance(clock=clock) if clock else vb.Instance()
-    instance.app.register(
-        "example.hello", kind="panel", scope="app", backend=FakeApp(),
+    register_app(instance, "example.hello", kind="panel", scope="app", backend=FakeApp(),
         groups_of_interest=groups_of_interest,
     )
     return instance
@@ -124,7 +124,7 @@ def test_a_token_for_one_app_does_not_pass_at_another():
     # Tohle je duvod, proc je audience povinna: bez ni je token pro apku X
     # klicem k apce Y, jakmile ho X ziska.
     instance = with_app()
-    instance.app.register("jina", kind="panel", scope="app", backend=FakeApp())
+    register_app(instance, "jina", kind="panel", scope="app", backend=FakeApp())
     token = instance.auth.issue(HANA, audience="app:example.hello")
     assert instance.auth.introspect(token, audience="app:jina") is None
 
@@ -133,7 +133,7 @@ def test_a_token_used_at_the_wrong_audience_is_audited():
     # Je to pokus o pouziti tokenu jinde, nez byl vydan - to patri do auditu
     # vzdycky, bez ohledu na prah logu.
     instance = with_app()
-    instance.app.register("jina", kind="panel", scope="app", backend=FakeApp())
+    register_app(instance, "jina", kind="panel", scope="app", backend=FakeApp())
     token = instance.auth.issue(HANA, audience="app:example.hello")
     instance.auth.introspect(token, audience="app:jina")
     assert any(r.action == "token_wrong_audience" for r in instance.audit)

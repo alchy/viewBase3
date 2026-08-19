@@ -17,6 +17,7 @@ import pytest
 import viewbase as vb
 from viewbase.core.identity import Caller
 from viewbase.runtime.content import AppBackend, ContentState
+from conftest import open_window, register_app
 
 
 class RecordingApp:
@@ -54,8 +55,7 @@ class OwnershipApp(RecordingApp):
 
 def prepared(backend=None, **kwargs):
     instance = vb.Instance(**kwargs)
-    instance.app.register(
-        "workbench.graph", kind="graph", scope="app", backend=backend or RecordingApp()
+    register_app(instance, "workbench.graph", kind="graph", scope="app", backend=backend or RecordingApp()
     )
     return instance, instance.screen.open(id="infra")
 
@@ -68,7 +68,7 @@ def prepared(backend=None, **kwargs):
 def test_an_internally_opened_window_is_not_anonymous_to_the_app():
     backend = RecordingApp()
     _, screen = prepared(backend)
-    screen.window.open("graph", id="net", app="workbench.graph")
+    open_window(screen, "graph", id="net", app="workbench.graph")
     assert backend.subjects[0]["subject_id"] != "anonymous"
 
 
@@ -77,7 +77,7 @@ def test_the_internal_caller_has_its_own_identity():
     # smi apka brat jako duveryhodnou.
     backend = RecordingApp()
     _, screen = prepared(backend)
-    screen.window.open("graph", id="net", app="workbench.graph")
+    open_window(screen, "graph", id="net", app="workbench.graph")
     assert backend.subjects[0]["subject_id"] == "service:instance"
 
 
@@ -85,7 +85,7 @@ def test_an_app_that_watches_who_calls_still_serves_the_library_code():
     # Tohle je ten bezny pripad, ne rohovy: kod aplikace otevre okno na svuj
     # vlastni obsah.
     _, screen = prepared(OwnershipApp())
-    window = screen.window.open("graph", id="net", app="workbench.graph")
+    window = open_window(screen, "graph", id="net", app="workbench.graph")
     assert window.content_state is ContentState.OK
 
 
@@ -93,7 +93,7 @@ def test_a_genuinely_anonymous_viewer_is_still_anonymous():
     # Oprava F-17 nesmi udelat z anonyma sluzbu.
     backend = RecordingApp()
     _, screen = prepared(backend)
-    window = screen.window.open("graph", id="net", app="workbench.graph")
+    window = open_window(screen, "graph", id="net", app="workbench.graph")
     window.access.read.set(["group:public"])
     screen.access.read.set(["group:public"])
 
@@ -110,7 +110,7 @@ def test_a_genuinely_anonymous_viewer_is_still_anonymous():
 def open_for(instance, screen, read, write):
     screen.access.read.set(read)
     screen.access.write.set(write)
-    window = screen.window.open("graph", id="net", app="workbench.graph")
+    window = open_window(screen, "graph", id="net", app="workbench.graph")
     window.access.read.set(read)
     window.access.write.set(write)
     return window
@@ -143,11 +143,11 @@ def test_capabilities_are_a_property_of_the_pair_not_of_the_caller():
     screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
 
-    ctouci = screen.window.open("graph", id="a", app="workbench.graph")
+    ctouci = open_window(screen, "graph", id="a", app="workbench.graph")
     ctouci.access.read.set(["group:users"])
     ctouci.access.write.set(["group:ucetni"])
 
-    pisici = screen.window.open("graph", id="b", app="workbench.graph")
+    pisici = open_window(screen, "graph", id="b", app="workbench.graph")
     pisici.access.read.set(["group:users"])
     pisici.access.write.set(["group:users"])
 
@@ -183,7 +183,7 @@ def test_the_owner_of_the_content_may_manage_it():
     instance, screen = prepared(backend)
     screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     window.access.read.set(["group:users"])
@@ -199,7 +199,7 @@ def test_someone_else_may_not_manage_it():
     instance, screen = prepared(backend)
     screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     window.access.read.set(["group:users"])
@@ -218,7 +218,7 @@ def test_the_administrator_reaches_a_foreign_content_through_a_capability():
     instance, screen = prepared(backend)
     screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     window.access.read.set(["group:users"])
@@ -303,7 +303,7 @@ def test_capabilities_come_out_in_the_declared_order():
     instance, screen = prepared(backend)
     screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
-    window = screen.window.open(
+    window = open_window(screen, 
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
     window.access.read.set(["group:users"])

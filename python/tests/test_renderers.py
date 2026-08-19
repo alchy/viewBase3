@@ -15,6 +15,7 @@ import pytest
 import viewbase as vb
 from viewbase.core.identity import Caller
 from viewbase.runtime.renderers import BUILTIN_KINDS
+from conftest import open_window, register_app
 
 
 class FakeApp:
@@ -107,21 +108,21 @@ def test_a_window_of_an_unknown_kind_is_refused():
     instance = vb.Instance()
     screen = instance.screen.open(id="infra")
     with pytest.raises(ValueError, match="kind"):
-        screen.window.open("nekdo.jineho.mapa", id="m")
+        open_window(screen, "nekdo.jineho.mapa", id="m")
 
 
 def test_the_refusal_lists_the_catalogue():
     instance = vb.Instance()
     screen = instance.screen.open(id="infra")
     with pytest.raises(ValueError, match="graph"):
-        screen.window.open("neexistuje", id="m")
+        open_window(screen, "neexistuje", id="m")
 
 
 def test_a_failed_open_on_an_unknown_kind_leaves_no_window_behind():
     instance = vb.Instance()
     screen = instance.screen.open(id="infra")
     with pytest.raises(ValueError):
-        screen.window.open("neexistuje", id="m")
+        open_window(screen, "neexistuje", id="m")
     assert screen.window.all() == ()
 
 
@@ -129,13 +130,13 @@ def test_an_app_declaring_an_unknown_kind_fails_the_registration():
     # Chyba autora se ma ozvat pri registraci, ne az kdyz nekdo otevre okno.
     instance = vb.Instance()
     with pytest.raises(ValueError, match="kind"):
-        instance.app.register("x", kind="neexistuje", scope="app", backend=FakeApp())
+        register_app(instance, "x", kind="neexistuje", scope="app", backend=FakeApp())
 
 
 def test_an_app_may_register_for_a_kind_added_to_the_catalogue():
     instance = vb.Instance()
     instance.renderer.register("table", contract="graph.v1")
-    instance.app.register("x", kind="table", scope="app", backend=FakeApp())
+    register_app(instance, "x", kind="table", scope="app", backend=FakeApp())
     assert "x" in instance.app
 
 
@@ -150,14 +151,14 @@ def test_a_renderer_needing_a_capability_the_instance_refuses_is_refused_at_open
     instance = vb.Instance(capabilities=["canvas2d"])
     screen = instance.screen.open(id="infra")
     with pytest.raises(ValueError, match="keyboard-capture"):
-        screen.window.open("shell", id="term")
+        open_window(screen, "shell", id="term")
 
 
 def test_an_optional_capability_does_not_block_the_window():
     # "webgl volitelne; jinak 2D ustup" - renderer se degraduje, nespadne.
     instance = vb.Instance(capabilities=["canvas2d"])
     screen = instance.screen.open(id="infra")
-    assert screen.window.open("graph", id="net").kind == "graph"
+    assert open_window(screen, "graph", id="net").kind == "graph"
 
 
 # ===========================================================================
@@ -170,13 +171,12 @@ def test_a_registration_cannot_bring_its_own_client_module():
     # kdyz apka JS nedodava, neni co pripinat ani co izolovat.
     instance = vb.Instance()
     with pytest.raises(TypeError):
-        instance.app.register(
-            "x", kind="panel", scope="app", backend=FakeApp(),
+        register_app(instance, "x", kind="panel", scope="app", backend=FakeApp(),
             client_module={"url": "/apps/x/ui.js", "sha256": "abc"},
         )
 
 
 def test_there_is_no_trust_level_on_a_registration():
     instance = vb.Instance()
-    registration = instance.app.register("x", kind="panel", scope="app", backend=FakeApp())
+    registration = register_app(instance, "x", kind="panel", scope="app", backend=FakeApp())
     assert not hasattr(registration, "trust")
