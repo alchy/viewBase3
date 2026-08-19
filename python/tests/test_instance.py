@@ -81,11 +81,14 @@ def test_screen_opens_a_window_of_a_kind_given_as_a_value():
     assert window.title == "Mzdy"
 
 
-def test_a_kind_the_core_never_heard_of_opens_just_the_same():
-    # Publikovany typ treti strany nema mit horsi cestu nez vestaveny.
+def test_a_kind_the_catalogue_does_not_know_is_refused():
+    # OBRACENO proti drivejsimu chovani (D-44). Kdyz apka nedodava JavaScript,
+    # zadny cizi renderer neexistuje - neznamy kind je preklep, ne cesta pro
+    # publikovany typ treti strany.
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    assert screen.window.open("nekdo.jineho.mapa", id="m").kind == "nekdo.jineho.mapa"
+    with pytest.raises(ValueError):
+        screen.window.open("nekdo.jineho.mapa", id="m")
 
 
 def test_window_can_be_looked_up_and_closed():

@@ -36,6 +36,9 @@ class AppRegistration:
     backend_base_url: str | None = None
     granted: tuple[str, ...] = ()
     refused: tuple[str, ...] = ()
+    #: Skupiny, o jejichz clenstvi si apka rekla. Introspekce vrati JEN tyhle
+    #: (D-48) - jinak se kazda apka dozvi celou pozici cloveka v organizaci.
+    groups_of_interest: tuple[str, ...] = ()
     _content: ContentRegistry | None = field(default=None, repr=False, compare=False)
     access: AccessFacade | None = field(default=None, repr=False, compare=False)
 
@@ -96,6 +99,7 @@ class AppCollection:
         backend_base_url: str | None = None,
         capabilities: dict | None = None,
         events: dict | None = None,
+        groups_of_interest: tuple[str, ...] = (),
         access=None,
     ) -> AppRegistration:
         """Zapis apku. Vsechno se overuje TED, ne az za behu.
@@ -108,6 +112,11 @@ class AppCollection:
             raise ValueError(f"apka uz je registrovana: {app_id!r}")
         if scope not in SCOPES:
             raise ValueError(f"neznamy scope {scope!r}; zname: {', '.join(SCOPES)}")
+        if kind is not None and kind not in self._instance.renderer:
+            raise ValueError(
+                f"apka {app_id!r} deklaruje neznamy kind {kind!r}; katalog zna: "
+                f"{', '.join(self._instance.renderer.known())}"
+            )
 
         granted, refused = self._negotiate(app_id, capabilities or {})
         declared = self._check_events(app_id, events or {})
@@ -116,6 +125,7 @@ class AppCollection:
         self._instance.objects.add(address, access)
         registration = AppRegistration(
             app_id, kind, scope, backend_base_url, granted, refused,
+            tuple(groups_of_interest),
             self._content, AccessFacade(self._instance, address),
         )
         self._registrations[app_id] = registration

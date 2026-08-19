@@ -25,6 +25,7 @@ from ..core.addressing import Address, new_id
 from ..core.identity import USERS
 from .access_facade import AccessFacade
 from .apps import AppCollection
+from .auth import AuthService
 from .content import ContentRegistry
 
 #: Schopnosti, ktere instance udeluje, kdyz se nerekne jinak. `fetch-origin`
@@ -33,6 +34,7 @@ from .content import ContentRegistry
 DEFAULT_CAPABILITIES = ("canvas2d", "webgl", "keyboard-capture", "file-drop")
 from .events import EventRegistry, Guard
 from .registry import ObjectRegistry
+from .renderers import RendererCatalogue
 from .screen import Screen
 from .sessions import Grants
 
@@ -123,6 +125,7 @@ class Instance:
         secret: str | bytes | None = None,
         app_timeouts: dict[str, float] | None = None,
         capabilities: Iterable[str] = DEFAULT_CAPABILITIES,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self.objects = ObjectRegistry(default_access=Acl.from_iterable(default_access))
         self.events = EventRegistry()
@@ -150,7 +153,12 @@ class Instance:
         #: Co tahle instance vubec umi udelit. Rozhoduje se pri REGISTRACI
         #: apky, ne za behu v cizim prohlizeci (D-40).
         self.capabilities = frozenset(capabilities)
+        #: Co tahle instance umi vykreslit. `kind` je nase vec - apka
+        #: JavaScript nedodava nikdy (D-44).
+        self.renderer = RendererCatalogue()
         self.app = AppCollection(self)
+        #: Jedine autentizacni API pro apky - autor apky ho nevymysli (D-47).
+        self.auth = AuthService(self, clock)
         self.guard = Guard(events=self.events, objects=self.objects, grants=self.grants)
 
     # -- jedina cesta ke zmene prav (D-14) -------------------------------

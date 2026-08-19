@@ -45,11 +45,12 @@ class WindowCollection:
     ) -> Window:
         """Otevri okno daneho typu a volitelne ho spoj s apkou.
 
-        `kind` se proti nicemu neoveruje: registr typu zatim neexistuje
-        a hlavne publikovany typ treti strany se ma otevrit stejne snadno
-        jako vestaveny.
+        `kind` je jmeno rendereru z naseho katalogu a overuje se HNED: apka
+        JavaScript nedodava, takze neznamy `kind` je preklep a neni na co se
+        odvolat (D-44). Zaroven se overi, ze instance umi rendereru dat, co
+        potrebuje.
 
-        `app` naopak overuje se, a HNED. Neznama a nedostupna apka jsou dve
+        `app` se overuje taky, a taky hned. Neznama a nedostupna apka jsou dve
         ruzne veci (D-24): `app` mimo registr je chyba autora a ma se ozvat
         okamzite se seznamem registrovanych - prave to chyta preklepy.
         Registrovana apka, ktera neodpovida, je provozni stav a resi se az
@@ -70,6 +71,7 @@ class WindowCollection:
 
         # Nejdriv overit, teprve potom zapsat: polovicne otevrene okno by melo
         # adresu v registru a nikdo by o nem nevedel.
+        instance.renderer.require(kind, instance.capabilities)
         if app is not None:
             self._check_app(app, kind)
 
