@@ -12,9 +12,15 @@ poradi na liste a adresu. Jako adresa je rozbity, protoze dva procesy vyrobi
 
 Tvary adres:
 
-    instance:log                    objekt instance (log, audit)
+    instance:                       sama instance (vlastni ACL, sprava)
+    instance:<jmeno>                objekt instance (log, audit)
     screen:<id>                     plocha
     screen:<id>/window:<id>         okno na plose
+
+Instance je objekt jako kazdy jiny - ma adresu a vlastni ACL. Diky tomu se
+udalosti spravy instance vyhodnocuji TOUZ funkci `resolve(address, verb)` jako
+vsechno ostatni a nevznika pro ne zvlastni cesta (D-17). Co ma privilegovanou
+zkratku, to se prestane testovat jako vsechno ostatni.
 
 Modul nezavisi na nicem (par. 11).
 """
@@ -69,8 +75,17 @@ class Address:
     # -- tovarny ---------------------------------------------------------
 
     @classmethod
+    def instance_root(cls) -> "Address":
+        """Sama instance. Koren, pod kterym visi jeji objekty."""
+        return cls((("instance", ""),))
+
+    @classmethod
     def instance(cls, name: str) -> "Address":
-        """Objekt, ktery patri instanci, ne plose (typicky log)."""
+        """Objekt, ktery patri instanci, ne plose (typicky log).
+
+        Visi pod `instance:`, takze bez vlastniho ACL dedi ACL instance -
+        nikdy ACL plochy, na ktere se zrovna zobrazuje (chyba 3.4).
+        """
         return cls((("instance", _validate(name, "jmeno objektu")),))
 
     @classmethod
@@ -108,11 +123,19 @@ class Address:
         """Nadrazeny objekt, nebo None.
 
         Nad plochou uz adresa neni: dedicnost pokracuje vychozi hodnotou
-        instance, a ta zadnou adresu nema (par. 4).
+        instance a ta se do stromu adres neplete (par. 4).
+
+        Objekt instance (`instance:log`) ma za rodice SAMU INSTANCI
+        (`instance:`), takze bez vlastniho ACL dedi ACL instance - nikdy ACL
+        plochy, na ktere se zrovna zobrazuje (chyba 3.4). Zapisuje se porad
+        jako `instance:log`; dvouclenna adresa by jen zdvojila prefix.
         """
-        if len(self.segments) == 1:
-            return None
-        return Address(self.segments[:-1])
+        if len(self.segments) > 1:
+            return Address(self.segments[:-1])
+        kind, value = self.segments[0]
+        if kind == "instance" and value:
+            return Address.instance_root()
+        return None
 
     def __str__(self) -> str:
         return "/".join(f"{kind}:{value}" for kind, value in self.segments)
@@ -141,12 +164,17 @@ class Address:
                 )
 
         for kind, value in segments:
+            if kind == "instance" and not value:
+                continue  # koren instance nema jmeno
             _validate(value, f"id v casti {kind!r}")
         return cls(segments)
 
 
 def _split_pair(part: str, whole: str) -> tuple[str, str]:
     kind, separator, value = part.partition(":")
-    if not separator or not kind or not value:
+    if not separator or not kind:
+        raise ValueError(f"cast adresy nema tvar 'typ:id': {whole!r}")
+    # Prazdna hodnota je platna jen u korene instance ("instance:").
+    if not value and kind != "instance":
         raise ValueError(f"cast adresy nema tvar 'typ:id': {whole!r}")
     return kind, value

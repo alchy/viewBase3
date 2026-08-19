@@ -29,7 +29,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ..core.access import Acl, Verb, allowed
+from ..core.access import Verb, allowed
 from ..core.addressing import Address
 from ..core.identity import Caller
 from .registry import ObjectRegistry
@@ -144,15 +144,19 @@ class EventRegistry:
 class Guard:
     """Jedine misto, kde se rozhoduje, jestli udalost smi na handler.
 
-    Dostane registr udalosti, registr objektu, evidenci kroku navic a ACL pro
-    spravu instance. Nic jineho nepotrebuje - a proto se da otestovat bez
-    serveru.
+    Dostane registr udalosti, registr objektu a evidenci kroku navic. Nic
+    jineho nepotrebuje - a proto se da otestovat bez serveru.
+
+    ACL pro spravu instance zvlast NEDOSTAVA: instance je objekt jako kazdy
+    jiny, ma adresu `instance:` a jeji prava se ctou touz funkci
+    `objects.resolve()` (D-17). Zvlastni pole by byla privilegovana cesta,
+    a co ma privilegovanou zkratku, to se prestane testovat jako vsechno
+    ostatni (chyba 3.4).
     """
 
     events: EventRegistry
     objects: ObjectRegistry
     grants: Grants
-    instance_access: Acl
 
     def check(
         self, caller: Caller, event: str, target: Address | None = None
@@ -163,7 +167,12 @@ class Guard:
             return Decision(Verdict.UNKNOWN_EVENT)
 
         if registration.needs is Needs.INSTANCE:
-            if not allowed(caller.principals, self.instance_access):
+            # Pomlcka v tabulce par. 5 znamena "netyka se", nikdy
+            # "nekontroluje se": udalost se neptá na plochu, ale ACL instance
+            # projit musi. Bez toho by INSTANCE byla `NONE` pod jinym jmenem
+            # (nalez F-11, chyba 3.2).
+            instance_acl = self.objects.resolve(Address.instance_root(), Verb.WRITE)
+            if not allowed(caller.principals, instance_acl):
                 return Decision(Verdict.INSTANCE_CLOSED)
             return Decision(Verdict.OK)
 

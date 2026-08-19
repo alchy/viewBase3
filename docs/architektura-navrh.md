@@ -181,7 +181,7 @@ politika a mělo by bydlet na jednom místě:
 ```python
 window.access.see.add("group:ucetni")
 window.access.write.set(["user:hana"])
-window.access.step_up = True          # chce kód, i když ACL projde
+window.access.require_authentication = True   # chce kód, i když ACL projde
 ```
 
 **b) `Acl` je neměnná hodnota, ale zápis zůstává čitelný.** Tyhle dvě věci
@@ -204,8 +204,15 @@ instance.set_access(address, Verb.SEE, acl.with_added("group:ucetni"), by=caller
 
 Fasáda **není měnitelná `Acl` v přestrojení**: čtení vrací snímek
 (`window.access.see.list()`), zápis jde jedinou cestou přes instanci.
-`window.access.step_up = True` je totéž — je to politika a audituje se
-stejně jako ACL.
+`window.access.require_authentication = True` je totéž — je to politika
+a audituje se stejně jako ACL.
+
+**Veřejné jméno říká, co se stane; vnitřní jméno pojmenovává mechanismus.**
+Vývojář píše `require_authentication` (rozumí tomu, aniž by znal pojem
+*step-up*); uvnitř se ta osa dál jmenuje `step_up`, protože tam jde
+o mechanismus a čtenářem je knihovna, ne autor aplikace. Koncept a volání
+nemusí mít stejné jméno — a veřejný povrch se pojmenovává pro toho, kdo ho
+čte poprvé.
 
 Protože je publikum vázané pozdně (§3), **změna platí na nejbližší
 doručenou zprávu**. Žádná neviditelná prodleva mezi „odebral jsem právo"
@@ -273,6 +280,8 @@ zasahovat jen správce. Brána plochy to zavírá, ale **jen když se zeptá
 zvlášť**.
 
 **Krok navíc je druhá, nezávislá osa**, ne pátá hodnota. `step_up` je
+u registrace události vnitřní jméno téhle osy (veřejná vlastnost okna se
+jmenuje `require_authentication`, viz §4b) a je
 `REQUIRED` (výchozí); `EXEMPT` má **jediná** událost — `window_unlock`,
 protože ta je právě tou cestou, kterou se krok navíc získává. Výjimka je
 tím deklarovaná, ne schovaná v komentáři, a strojový test hlídá, že ji nemá

@@ -58,7 +58,7 @@ proto uvádí, jak se pojem jmenuje v kódu:
 | principál | `principal` |
 | práva / přístup | `access`, `acl` |
 | publikum | `audience` |
-| krok navíc | `step_up` |
+| krok navíc | `require_authentication` (veřejná vlastnost okna), `step_up` (vnitřní osa registrace události) |
 | adresa | `address` |
 | stupeň důvěry | `trust` |
 | schopnost | `capability` |
@@ -67,6 +67,20 @@ proto uvádí, jak se pojem jmenuje v kódu:
 Totéž platí pro klíče payloadu, jména souborů, parametry cest v routách
 a jména v konfiguraci — anglicky. Texty pro diváka jdou ze serveru jako
 **klíč a parametry**, ne jako hotová věta; překlad je na klientovi.
+
+## Kolekce versus vlastnost
+
+Dva různé tvary a nemíchají se:
+
+| co to je | tvar | příklad |
+|---|---|---|
+| **kolekce** — věcí je víc a dělají se s nimi operace | `kde.objekt.co` | `instance.screen.open(…)`, `screen.window.get("hello")`, `screen.window.all()` |
+| **vlastnost** jednoho objektu | prostý atribut | `w.title`, `w.closable`, `w.access.require_authentication` |
+
+Žádné `w.set.*` ani `w.get.*`: čtení a zápis mají být symetrické a to, co by
+od jmenného prostoru někdo čekal (že zápis něco udělá — projde přes instanci
+a zapíše se do auditu), obstará property setter sám. Jmenný prostor by přidal
+jen slova a rozbil symetrii.
 
 ## Pojmenování v protokolu
 

@@ -32,8 +32,23 @@ def test_screen_has_no_parent():
     assert Address.screen("provoz").parent is None
 
 
-def test_instance_address_has_no_parent():
-    assert Address.instance("log").parent is None
+def test_instance_object_hangs_under_the_instance_itself():
+    # D-17: instance je objekt jako kazdy jiny - ma adresu a vlastni ACL.
+    # Diky tomu se INSTANCE udalosti vyhodnocuji touz funkci resolve()
+    # a nevznika zvlastni cesta.
+    assert Address.instance("log").parent == Address.instance_root()
+
+
+def test_the_instance_itself_is_the_top():
+    assert Address.instance_root().parent is None
+
+
+def test_instance_root_renders_as_a_bare_prefix():
+    assert str(Address.instance_root()) == "instance:"
+
+
+def test_instance_root_round_trips_through_string():
+    assert Address.parse("instance:") == Address.instance_root()
 
 
 def test_address_is_a_value_usable_as_a_key():

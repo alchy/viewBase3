@@ -39,6 +39,16 @@ class ObjectRegistry:
             raise ValueError(f"adresa uz je obsazena: {address}")
         self._objects[address] = access if access is not None else Access()
 
+    def replace_access(self, address: Address, access: Access) -> None:
+        """Vymen politiku objektu za novou hodnotu.
+
+        Zmenu vede instance, ne objekt - jen ona k ni umi pripojit kdo/kdy/co
+        (par. 4b). Registr je tady uloziste, ne rozhodovaci misto.
+        """
+        if address not in self._objects:
+            raise KeyError(address)
+        self._objects[address] = access
+
     def remove(self, address: Address) -> None:
         self._objects.pop(address, None)
 
@@ -63,6 +73,13 @@ class ObjectRegistry:
         k doruceni pote, co okno zaniklo; "neznam" nesmi znamenat "vychozi"
         (chyba 3.5) a uz vubec ne "kdokoli". Totez plati, kdyz zanikne rodic:
         osirely objekt nema od koho dedit a je zavreny.
+
+        DVA RUZNE VYCHOZI STAVY. Retez plochy konci `default_access` instance
+        (typicky `group:users`) - to je ta rozumna hodnota pro plochy a okna.
+        Retez instance konci ZAVRENO: auditni stopa a sprava instance, na
+        kterych nikdo ACL nenastavil, nesmi byt otevrene vsem prihlasenym
+        (par. 7). Kdyby oboji koncilo `default_access`, staci zapomenout na
+        ACL logu a je z nej verejny audit.
         """
         chain: list[Access] = []
         current: Address | None = address
@@ -71,7 +88,12 @@ class ObjectRegistry:
                 return Acl.empty()
             chain.append(self._objects[current])
             current = current.parent
-        return effective_acl(verb, chain, default=self.default_access)
+        default = (
+            self.default_access
+            if address.segments[0][0] == "screen"
+            else Acl.empty()
+        )
+        return effective_acl(verb, chain, default=default)
 
     def step_up_at(self, address: Address) -> bool:
         """Chce tenhle objekt krok navic?

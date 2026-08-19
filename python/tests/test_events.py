@@ -39,13 +39,15 @@ def noop(*args, **kwargs):  # pragma: no cover - handler se v testech nevola
     return None
 
 
-def guard_over(objects, registry=None, grants=None, instance_access=Acl.empty()):
+ROOT = Address.instance_root()
+
+
+def guard_over(objects, registry=None, grants=None):
     registry = registry if registry is not None else EventRegistry()
     return Guard(
         events=registry,
         objects=objects,
         grants=grants if grants is not None else Grants(),
-        instance_access=instance_access,
     )
 
 
@@ -365,28 +367,59 @@ def test_revoking_a_session_drops_its_grants():
 # ===========================================================================
 
 
-def test_instance_event_is_closed_to_an_ordinary_user():
+def instance_setup(root_access=Access()):
     objects = ObjectRegistry(default_access=Acl.of(USERS))
+    objects.add(ROOT, root_access)
     registry = EventRegistry()
     registry.register("instance_shutdown", noop, needs=Needs.INSTANCE)
-    guard = guard_over(objects, registry, instance_access=Acl.empty())
-    assert guard.check(Caller.for_user("hana"), "instance_shutdown").verdict is Verdict.INSTANCE_CLOSED
+    return objects, registry
+
+
+def test_instance_event_is_closed_to_an_ordinary_user():
+    objects, registry = instance_setup()
+    guard = guard_over(objects, registry)
+    assert (
+        guard.check(Caller.for_user("hana"), "instance_shutdown").verdict
+        is Verdict.INSTANCE_CLOSED
+    )
 
 
 def test_instance_event_lets_the_administrator_through():
-    objects = ObjectRegistry(default_access=Acl.of(USERS))
-    registry = EventRegistry()
-    registry.register("instance_shutdown", noop, needs=Needs.INSTANCE)
-    guard = guard_over(objects, registry, instance_access=Acl.empty())
+    objects, registry = instance_setup()
+    guard = guard_over(objects, registry)
     assert guard.check(Caller.for_user("spravce", ["administrator"]), "instance_shutdown")
 
 
+def test_instance_event_can_be_opened_to_a_named_group():
+    objects, registry = instance_setup(Access(write=Acl.of("group:operator")))
+    guard = guard_over(objects, registry)
+    assert guard.check(Caller.for_user("hana", ["operator"]), "instance_shutdown")
+
+
 def test_instance_event_does_not_need_a_screen():
-    objects = ObjectRegistry(default_access=Acl.empty())
+    # Pomlcka v tabulce par. 5 znamena "netyka se", ne "nekontroluje se":
+    # udalost se neptá na plochu, ale ACL instance projit MUSI (D-17).
+    objects, registry = instance_setup(Access(write=Acl.of("group:operator")))
+    guard = guard_over(objects, registry)
+    assert len(objects) == 1  # zadna plocha v registru neni
+    assert guard.check(Caller.for_user("hana", ["operator"]), "instance_shutdown")
+
+
+def test_instance_event_is_evaluated_through_the_same_resolve_as_everything_else():
+    # D-17: instance je objekt jako kazdy jiny. Co ma privilegovanou zkratku,
+    # to se prestane testovat jako vsechno ostatni (chyba 3.4).
+    objects, registry = instance_setup(Access(write=Acl.of("group:operator")))
+    guard = guard_over(objects, registry)
+    assert objects.resolve(ROOT, Verb.WRITE) == Acl.of("group:operator")
+    assert not hasattr(guard, "instance_access")
+
+
+def test_instance_event_on_an_instance_that_registered_no_root_is_closed():
+    objects = ObjectRegistry(default_access=Acl.of(USERS))
     registry = EventRegistry()
     registry.register("instance_shutdown", noop, needs=Needs.INSTANCE)
-    guard = guard_over(objects, registry, instance_access=Acl.of("group:operator"))
-    assert guard.check(Caller.for_user("hana", ["operator"]), "instance_shutdown")
+    guard = guard_over(objects, registry)
+    assert not guard.check(Caller.for_user("hana"), "instance_shutdown")
 
 
 # ===========================================================================

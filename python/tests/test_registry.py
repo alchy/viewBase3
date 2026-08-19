@@ -9,7 +9,7 @@ import pytest
 
 from viewbase.core.access import Access, Acl, Verb
 from viewbase.core.addressing import Address
-from viewbase.core.identity import USERS
+from viewbase.core.identity import ADMINISTRATOR, USERS
 from viewbase.runtime.registry import ObjectRegistry
 
 PROVOZ = Address.screen("provoz")
@@ -92,13 +92,15 @@ def test_instance_object_does_not_inherit_from_any_screen():
     # Auditni stopa je instance-wide; kdyby dedila od plochy, na ktere zrovna
     # lezi okno, publikuje ji prvni verejna plocha (chyba 3.4).
     reg = registry(default=Acl.empty())
+    reg.add(Address.instance_root())
     reg.add(PROVOZ, Access(see=Acl.of("group:public")))
     reg.add(LOG, Access(see=Acl.of("group:auditor")))
     assert reg.resolve(LOG, Verb.SEE) == Acl.of("group:auditor")
 
 
-def test_instance_object_without_acl_takes_the_instance_default_not_a_screen():
-    reg = registry(default=Acl.empty())
+def test_instance_object_without_acl_does_not_take_anything_from_a_screen():
+    reg = registry(default=Acl.of(USERS))
+    reg.add(Address.instance_root())
     reg.add(PROVOZ, Access(see=Acl.of("group:public")))
     reg.add(LOG)
     assert reg.resolve(LOG, Verb.SEE) == Acl.empty()
@@ -142,3 +144,41 @@ def test_step_up_is_not_inherited_from_the_screen():
 
 def test_step_up_at_an_unknown_address_is_required_not_waived():
     assert registry().step_up_at(MZDY) is True
+
+
+# -- instance je objekt jako kazdy jiny (D-17) -----------------------------
+
+ROOT = Address.instance_root()
+
+
+def test_instance_object_inherits_from_the_instance_itself():
+    reg = registry(default=Acl.of(USERS))
+    reg.add(ROOT, Access(see=Acl.of("group:auditor"), write=Acl.of(ADMINISTRATOR)))
+    reg.add(LOG)
+    assert reg.resolve(LOG, Verb.SEE) == Acl.of("group:auditor")
+
+
+def test_instance_object_never_falls_to_the_instance_default():
+    # Vychozi hodnota instance (typicky group:users) plati pro plochy a okna.
+    # Auditni stopa je neco jineho: kdyz na ni nikdo ACL nenastavi, je ZAVRENA,
+    # ne "kdokoli prihlaseny" (par. 7).
+    reg = registry(default=Acl.of(USERS))
+    reg.add(ROOT)
+    reg.add(LOG)
+    assert reg.resolve(LOG, Verb.SEE) == Acl.empty()
+
+
+def test_the_instance_itself_is_closed_when_nobody_set_it():
+    # Sprava instance bez nastaveni nesmi byt otevrena vsem prihlasenym -
+    # jinak by kazdy uzivatel mohl vyvolat udalost s needs=INSTANCE.
+    reg = registry(default=Acl.of(USERS))
+    reg.add(ROOT)
+    assert reg.resolve(ROOT, Verb.WRITE) == Acl.empty()
+
+
+def test_screens_still_fall_to_the_instance_default():
+    # Dva ruzne vychozi stavy vedle sebe: plocha bere default_access,
+    # instance-wide objekt bere zavreno.
+    reg = registry(default=Acl.of(USERS))
+    reg.add(PROVOZ)
+    assert reg.resolve(PROVOZ, Verb.SEE) == Acl.of(USERS)

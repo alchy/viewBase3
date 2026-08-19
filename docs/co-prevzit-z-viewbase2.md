@@ -34,7 +34,7 @@ se v novém návrhu nesmí zopakovat, s pravidlem, které je zavírá.*
 | **deklarace `needs` u registrace události** | myšlenka je správná, ale **brána plochy musí platit vždycky** a žádná hodnota ji nesmí vypnout. Ve viewBase2 existovala `NONE` ve významu „nekontroluj nic". |
 | **adresní značky zpráv** (`only_sid`, `grant`, `acl`) | správný nápad na špatném místě: publikum se lepí až při doručení. V3 je publikum součástí zprávy od jejího vzniku. |
 | **`snapshot(sid=None)`** | zrušit výchozí hodnotu. „Když se nikdo neptá pro koho, dej všechno" je přesně ta cesta, kterou obsah unikne. |
-| **`private=True` jako booleán na okně** | krok navíc je politika a patří k ostatní politice: `window.access.step_up = True`. |
+| **`private=True` jako booleán na okně** | krok navíc je politika a patří k ostatní politice: `window.access.require_authentication = True`. |
 | **mixiny se sdíleným stavem** | `WindowsMixin`/`EventsMixin` očekávají `self._lock`, `self._actions`, `self._reg` — je to dohoda, ne rozhraní. Kompozice místo dědičnosti. |
 | **`HtmlWindow` + `ControlWindow`** | sloučit do jednoho typu `panel` (viz [typy-oken.md](typy-oken.md)). |
 | **log okno** | nesmí být speciální případ mimo běžnou cestu. Je to typ okna jako každý jiný, jen jeho obsah dodává runtime — a jeho ACL se **nedědí z plochy**. |
