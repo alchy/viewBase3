@@ -111,8 +111,9 @@ Množina principálů proto v `Audience` vůbec není — a to je záměr: neexi
 tvar, kterým by šlo publikum omylem zmrazit.
 
 Vysílací smyčka pak **neví nic o oknech ani o právech** — dostane při startu
-jedinou funkci `resolve(address) -> Acl` a ptá se
-`audience.allows(caller, resolve)`. Jedna předaná funkce, žádný import
+jedinou funkci `resolve(address, verb) -> Acl` a ptá se
+`audience.allows(caller, resolve)`. (Sloveso tam patří: tatáž adresa má pro
+`see` a pro `write` jiné ACL.) Jedna předaná funkce, žádný import
 napříč vrstvami. Objekty naopak nevědí nic o soketech.
 
 Praktický důsledek: `LogView` je jen další zdroj zpráv s vlastním publikem.
@@ -159,11 +160,32 @@ window.access.write.set(["user:hana"])
 window.access.step_up = True          # chce kód, i když ACL projde
 ```
 
-**b) ACL objektu je neměnná hodnota, měnit jde jen přes instanci.** Ve
-viewBase2 se práva mění metodami na objektu (`okno.access.add(...)`) a
-audit se dělá uvnitř `Acl`. Čistší je nechat `Acl` být hodnotou a změnu
-vést přes instanci, která k ní může přidat kdo/kdy/proč. (Menší věc, ale
-zjednoduší to auditní stopu.)
+**b) `Acl` je neměnná hodnota, ale zápis zůstává čitelný.** Tyhle dvě věci
+si na první pohled odporují (a chvíli si v tomhle dokumentu opravdu
+odporovaly, viz nález F-06). Řeší se to tak, že se **rozdělí, co je hodnota,
+a co je API**:
+
+- v `core/` je `Acl` **hodnota**: `with_added()` a `without()` vracejí novou.
+  Nic o auditu neví a vědět nemá,
+- `window.access` v `runtime/` je **fasáda**: přečte současnou hodnotu,
+  spočítá novou a **vede změnu přes instanci**, která k ní připojí kdo, kdy
+  a na jakém objektu — a zapíše to do auditu.
+
+```python
+window.access.see.add("group:ucetni")     # čte se jako knihovna (D-01)
+   ↓
+instance.set_access(address, Verb.SEE, acl.with_added("group:ucetni"), by=caller)
+   ↓  audit: access change: screen:provoz/window:mzdy see +group:ucetni
+```
+
+Fasáda **není měnitelná `Acl` v přestrojení**: čtení vrací snímek
+(`window.access.see.list()`), zápis jde jedinou cestou přes instanci.
+`window.access.step_up = True` je totéž — je to politika a audituje se
+stejně jako ACL.
+
+Protože je publikum vázané pozdně (§3), **změna platí na nejbližší
+doručenou zprávu**. Žádná neviditelná prodleva mezi „odebral jsem právo"
+a „přestalo to chodit".
 
 **c) Dokumentovaný zápis musí mít test.** Ve viewBase2 byl
 `okno.access.add(...)` v README, v docs i ve specifikaci, ale `Access` tu
@@ -200,6 +222,15 @@ Enum je **úplný** a nemá hodnotu, která by kontrolu vypínala:
 | `SCREEN` | zasahovat | – | – |
 | `SEE` | vidět | ano | – |
 | `WRITE` | zasahovat | ano | ano |
+
+**Obě úrovně se kontrolují zvlášť, dědičnost je nesloučí.** Dědičnost
+odpovídá na otázku „jaké ACL platí pro *tenhle* objekt"; brána plochy je
+**samostatná** kontrola před ní. Konkrétní past: okno má `see=[users]`,
+plocha má `write=[administrator]`. Nenastavené `write` okna padá na jeho
+vlastní `see`, takže efektivní ACL okna pro zápis je `[users]` — a kdyby
+runtime kontroloval jen okno, uživatel by psal do okna na ploše, kde smí
+zasahovat jen správce. Brána plochy to zavírá, ale **jen když se zeptá
+zvlášť**.
 
 **Krok navíc je druhá, nezávislá osa**, ne pátá hodnota. `step_up` je
 `REQUIRED` (výchozí); `EXEMPT` má **jediná** událost — `window_unlock`,
@@ -321,7 +352,8 @@ Jeden strom, závislosti jdou jedním směrem:
 
 ```
 python/viewbase/
-  core/         identity, access, audience, addressing   ← nezávisí na NIČEM
+  core/         identity (principálové + Caller), access, audience,
+                addressing                                ← nezávisí na NIČEM
   runtime/      instance, sessions, registry, events, screen, window (rám)
   transport/    protocol, server, rest
   providers/    identity_file, identity_ldap, policy_file, policy_db
@@ -393,8 +425,24 @@ Otázky, na které viewBase2 odpovídal postupně a stálo to přepisování:
    za běhu** — validátor na obou stranách a jedna sada fixtur, kterou
    prochází server i klient. Bez toho se strany rozejdou a nikdo si toho
    nevšimne.
-5. **Co je veřejné API.** viewBase2 to má popsané až zpětně. Rozhodnout
-   dřív znamená, že se vnitřek dá měnit bez ohledů.
+5. **Co je veřejné API.** — ✅ **rozhodnuto.** Veřejné je to, co vývojář
+   **napíše**, a je toho málo:
+
+   ```python
+   import viewbase as vb
+
+   instance = vb.Instance(...)          # runtime, vlastník stavu
+   vb.Needs, vb.StepUp, vb.Verb         # to, co se jmenuje při registraci
+   ```
+
+   Všechno ostatní se získává **z instance**, ne importem: plochy z
+   `instance.screen(...)`, okna z `screen.panel(...)`, obsah metodami okna.
+   Vývojář nikdy neimportuje `viewbase.core.*` — to je vnitřek.
+
+   Vynucuje to `__all__` **a test**, který porovná veřejná jména modulu
+   s dokumentovaným seznamem. Bez toho se povrch rozroste náhodou a pak se
+   nedá zúžit, aniž by se něco rozbilo — a přesně proto to viewBase2 nemá
+   popsané dopředu, ale zpětně.
 
 ## 13. Co z viewBase2 převzít beze změny
 
