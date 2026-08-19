@@ -35,7 +35,9 @@ změnit, změní se tady a pak všude.
 |---|---|
 | **principál** | `user:hana`, `group:ucetni` — to, proti čemu se vyhodnocuje ACL |
 | **ACL** | množina povolených principálů. Žádné „deny". |
-| **sloveso** | `see` (vidět) / `write` (zasahovat) |
+| **sloveso** | `read` (vidět) / `write` (zasahovat) — **jen tyhle dvě** |
+| **manage** | není sloveso ACL: **odvozené** právo zakladatele objektu nebo správce (přejmenovat, zrušit, změnit ACL) |
+| **nabídka** | „tuhle apku jde na téhle ploše otevřít" — přežije zavření okna |
 | **krok navíc** (step-up) | „jsi to fakt ty, teď?" — kód z autentikátoru u soukromého okna. Ortogonální k ACL. |
 | **adresa** | `screen:<id>`, `screen:<id>/window:<id>`, `instance:log`. Klíč pro práva, log i vzdálené volání. |
 | **publikum** (Audience) | komu se zpráva smí doručit. `Ref(adresa, sloveso)` nebo `Session(sid)`. |

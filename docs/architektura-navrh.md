@@ -39,7 +39,18 @@ viewBase2 byly v těchhle třech místech.
    registrovanou událost platí, že…" chytí i tu desátou, kterou nikdo
    nenapsal.
 
-Zbytek dokumentu je jen rozvedení těchhle pěti vět.
+6. **Zjednodušuje se, kdekoli to jde.** Každý přírůstek k modelu musí
+   pojmenovat **konkrétní chybu, kterou zavírá**; co ji pojmenovat neumí,
+   se nepřidá. A když je pochyb, škrtá se.
+
+Zbytek dokumentu je jen rozvedení těchhle šesti vět.
+
+Šestý bod není fráze — v jednom odpoledni podle něj padly tři věci, které
+už byly navržené: sloveso `manage` v ACL (dědičnost ho rozbíjela), ACL apky
+v průniku (patří spouštěči) a `window.open` při startu (okno si otevře
+divák). Model práv, který si člověk nedokáže představit v hlavě, se
+nastavuje zkusmo — a takhle nastavená práva jsou vždycky širší, než kdo
+chtěl. **Nesrozumitelnost je u autorizace bezpečnostní vada, ne estetická.**
 
 ## 2. Objektový model
 
@@ -137,7 +148,7 @@ tvar, kterým by šlo publikum omylem zmrazit.
 Vysílací smyčka pak **neví nic o oknech ani o právech** — dostane při startu
 jedinou funkci `resolve(address, verb) -> Acl` a ptá se
 `audience.allows(caller, resolve)`. (Sloveso tam patří: tatáž adresa má pro
-`see` a pro `write` jiné ACL.) Jedna předaná funkce, žádný import
+`read` a pro `write` jiné ACL.) Jedna předaná funkce, žádný import
 napříč vrstvami. Objekty naopak nevědí nic o soketech.
 
 Praktický důsledek: `LogView` je jen další zdroj zpráv s vlastním publikem.
@@ -179,8 +190,8 @@ Tři věci bych udělal jinak:
 politika a mělo by bydlet na jednom místě:
 
 ```python
-window.access.see.set(["group:ucetni"])       # vlastní ACL okna; končí dědění
-window.access.see.add("user:hana")            # …a ještě konkrétní člověk
+window.access.read.set(["group:ucetni"])       # vlastní ACL okna; končí dědění
+window.access.read.add("user:hana")            # …a ještě konkrétní člověk
 window.access.write.set(["user:hana"])
 window.access.require_authentication = True   # chce kód, i když ACL projde
 ```
@@ -192,7 +203,7 @@ jsou špatně:
 
 | výklad | co udělá | proč je špatně |
 |---|---|---|
-| začni od **vlastního** (prázdného) | okno dědící `see=[users]` se po `add("group:ucetni")` stane viditelným **jen účetním** | slovo „přidej" viditelnost **zúžilo** |
+| začni od **vlastního** (prázdného) | okno dědící `read=[users]` se po `add("group:ucetni")` stane viditelným **jen účetním** | slovo „přidej" viditelnost **zúžilo** |
 | začni od **efektivního** | vyjde `[users, ucetni]`, jak čtenář čeká | **zmrazí dědičnost** — pozdější zúžení plochy už na okno nedosáhne, a to je cesta k úniku |
 
 Druhý výklad selhává **tiše a otevřeně** (lidé vidí, co nemají), první
@@ -212,14 +223,14 @@ a co je API**:
   a na jakém objektu — a zapíše to do auditu.
 
 ```python
-window.access.see.add("group:ucetni")     # čte se jako knihovna (D-01)
+window.access.read.add("group:ucetni")     # čte se jako knihovna (D-01)
    ↓
-instance.set_access(address, Verb.SEE, acl.with_added("group:ucetni"), by=caller)
-   ↓  audit: access change: screen:provoz/window:mzdy see +group:ucetni by=internal
+instance.set_access(address, Verb.READ, acl.with_added("group:ucetni"), by=caller)
+   ↓  audit: access change: screen:provoz/window:mzdy read +group:ucetni by=internal
 ```
 
 Fasáda **není měnitelná `Acl` v přestrojení**: čtení vrací snímek
-(`window.access.see.list()`), zápis jde jedinou cestou přes instanci.
+(`window.access.read.list()`), zápis jde jedinou cestou přes instanci.
 
 **`by` je v záznamu vždycky**, i když změnu udělal vlastní kód knihovny —
 tam je hodnota `internal`. Až budou práva chodit i po drátě, ponese totéž
@@ -263,7 +274,7 @@ jen, co se žádá *navíc*:
 
 ```python
 register("shell_input",   handler, needs=Needs.WRITE)
-register("window_unlock", handler, needs=Needs.SEE, step_up=StepUp.EXEMPT)
+register("window_unlock", handler, needs=Needs.READ, step_up=StepUp.EXEMPT)
 register("menu_select",   handler, needs=Needs.SCREEN)
 ```
 
@@ -273,7 +284,7 @@ Enum je **úplný** a nemá hodnotu, která by kontrolu vypínala:
 |---|---|---|---|
 | `INSTANCE` | **ACL instance** (`instance:`, sloveso *zasahovat*) | – | – |
 | `SCREEN` | ACL plochy, *zasahovat* | – | – |
-| `SEE` | ACL plochy, *vidět* | ano | – |
+| `READ` | ACL plochy, *vidět* | ano | – |
 | `WRITE` | ACL plochy, *zasahovat* | ano | ano |
 
 **Pomlčka znamená „netýká se", nikdy „nekontroluje se".** Každá hodnota má
@@ -294,9 +305,9 @@ nikdy nedoručilo, takže zápis do něj může přijít jen z podvrženého kli
 
 **Obě úrovně se kontrolují zvlášť, dědičnost je nesloučí.** Dědičnost
 odpovídá na otázku „jaké ACL platí pro *tenhle* objekt"; brána plochy je
-**samostatná** kontrola před ní. Konkrétní past: okno má `see=[users]`,
+**samostatná** kontrola před ní. Konkrétní past: okno má `read=[users]`,
 plocha má `write=[administrator]`. Nenastavené `write` okna padá na jeho
-vlastní `see`, takže efektivní ACL okna pro zápis je `[users]` — a kdyby
+vlastní `read`, takže efektivní ACL okna pro zápis je `[users]` — a kdyby
 runtime kontroloval jen okno, uživatel by psal do okna na ploše, kde smí
 zasahovat jen správce. Brána plochy to zavírá, ale **jen když se zeptá
 zvlášť**.
@@ -546,3 +557,131 @@ Otázky, na které viewBase2 odpovídal postupně a stálo to přepisování:
 
 *Podrobná inventura — co portovat, co přepsat a které konkrétní chyby se
 nesmí vrátit — je v [co-prevzit-z-viewbase2.md](co-prevzit-z-viewbase2.md).*
+
+---
+
+## Dodatek: konečný tvar veřejného API a práv
+
+*Rozhodnuto s vlastníkem projektu po prověření na grafové apce. Nahrazuje
+dřívější tvary v §2, §4 a §5 tam, kde se rozcházejí.*
+
+### Dvě slovesa, nic víc
+
+```python
+objekt.access.read     kdo objekt smí vnímat a dostávat jeho data
+objekt.access.write    kdo smí měnit jeho obsah
+objekt.access.require_authentication    ortogonální osa; nic neuděluje
+```
+
+**`manage` v ACL není.** Přejmenovat, zrušit a měnit práva smí **zakladatel
+objektu nebo správce** — odvozené, ne deklarované. Důvod je dědičnost:
+nenastavené `manage` by spadlo až na `default_access`, takže by objekt směl
+zrušit kdokoli přihlášený, a musela by se přidat výjimka „manage se dědí
+jinak". Pravidlo navíc kvůli vlastnosti, kterou skoro nikdo nepoužije.
+
+### Průnik má dva členy
+
+```
+efektivní právo diváka v okně = okno ∩ obsah
+```
+
+ACL **registrace apky do průniku nepatří** — týká se **spouštěče**, tedy
+toho, kdo apku uvidí v nabídce. Když je okno otevřené na ploše, kterou divák
+vidí, nedává smysl mu obsah zavřít proto, že „na apku nemá".
+
+**Druhá úroveň se platí, jen když se použije:** ACL obsahu nenastavené
+neznamená žádné omezení navíc, takže v běžném případě je efektivní právo
+prostě právo okna a vývojář píše jednu sadu ACL.
+
+### Objekty místo řetězců, manifest se neopakuje
+
+```python
+inst   = vb.Instance(default_access=["group:users"])
+graf   = inst.app.register(GraphApp())        # app_id, kind i scope jsou v manifestu
+provoz = inst.screen.open(title="Provoz")
+provoz.app.register(graf, title="Síť")        # nabídni ji na téhle ploše
+inst.serve()
+```
+
+**Při startu neexistuje žádné okno.** Vývojář deklaruje jen *co jde otevřít
+kde*; okna vznikají tím, že si je divák otevře. Je to poctivější (workbench
+je prostředí, ne scénář) a v kódu z toho zmizí celá jedna vrstva.
+
+Šest řádků, žádná id (přidělí se), žádná ACL (dědí se), žádná rukojeť (obsah
+vznikne s oknem). **To je měřítko, jestli je API jednoduché.**
+
+Když je potřeba víc, přidává se po jednom:
+
+```python
+graf   = inst.app.register(GraphApp(), read=["group:ucetni"])
+provoz = inst.screen.open(title="Provoz", id="provoz",
+                          read=["group:ucetni", "group:sklad"],
+                          write=["group:ucetni"])
+
+provoz.app.register(graf, title="Síť",           # nabídka na téhle ploše
+                    read=["group:ucetni", "group:sklad"],   # …a ACL oken,
+                    write=["group:ucetni"],                 #    která z ní vzniknou
+                    require_authentication=True)
+```
+
+ACL se tedy deklaruje **na nabídce** a okno, které z ní vznikne, ho zdědí.
+Kdo chce práva jednoho konkrétního okna změnit za běhu, má pořád
+`w.access.read.add(…)` — jen se k tomu oknu dostane až tehdy, když existuje
+(`provoz.window.get("net")`).
+
+Dvě pravidla, která ten tvar drží:
+
+1. **Co je v manifestu, se v kódu nepíše znovu.** `register(GraphApp())` si
+   `app_id`, `kind` i `scope` vezme odtamtud — jinak se to dá rozejít.
+2. **Objekty místo řetězců.** `window.open(app=graf, content=g)`, ne
+   `app="workbench.graph", handle="vb1_…"`. Řetězce patří do konfigurace
+   a na drát, ne do volání.
+
+### Nabídka: jediné sloveso
+
+```python
+provoz.app.register(graf, title="Síť")   # tuhle apku jde na téhle ploše otevřít
+```
+
+**Žádné `open`.** Okno si otevře divák z nabídky, vždycky. Zvažovali jsme
+`open` / `offer` i příznak `open_on_start`, ale obojí je zbytečné: příznak
+by udělal z volání `open(..., False)` větu „otevři, ale neotevírej", a druhé
+sloveso by existovalo kvůli případu, který má stejně řešit divák.
+
+`screen.app.register(...)` říká přesně, co se děje — apka se registruje do
+nabídky plochy. Nesahá se přitom na žádné okno, protože žádné ještě není.
+`screen.window.*` zůstává pro běh (`get`, `all`, `close`).
+
+Zavření okna nabídku **neruší**, právě proto, aby šlo otevřít znovu. Je to
+stejný vztah jako *obsah vs. pohled*, o patro výš:
+
+```
+nabídka  (deklaruje vývojář)   přežije všechno
+   ↓ kliknutí
+okno     (pohled)              vzniká a zaniká
+   ↓
+obsah    (stav u apky)         žije podle scope
+```
+
+**Žádnou novou plochu práv to nepřidává:** nabídku uvidí ten, kdo vidí plochu
+i apku. Po kliknutí rozhodne `scope`, co s obsahem — odvozený vznikne sám,
+u `explicit` se nejdřív nabídne výběr (*Nový graf / Graph #1 / …*).
+
+Dvě slovesa místo příznaku schválně: `open(..., open_on_start=False)` se čte
+jako „otevři, ale neotevírej", a u volání pak nikdo neví, co ta `False`
+znamená.
+
+### `serve()` nespouští apky
+
+`inst.serve()` obsadí port, otevře WebSocket a rozjede vysílací smyčku —
+to je celé. Apka běžící v procesu žije od chvíle, kdy vznikla; apka
+v kontejneru běží nezávisle a `serve()` se jí nedotkne. **Workbench apky
+nespouští**; registrace jen říká „vím o tobě a takhle tě mám volat".
+
+### Hranice, kterou nepřekročit
+
+Čtvrté sloveso, druhý druh dědičnosti ani „deny" pravidla. Dvě slovesa
+a jedna dědičnost jsou zhruba to, co se dá držet v hlavě — a za tou hranicí
+se práva přestanou nastavovat podle úmyslu a začnou se nastavovat zkusmo,
+*„dokud to nefunguje"*. Takhle nastavená práva jsou vždycky širší, než kdo
+chtěl.

@@ -1,9 +1,9 @@
 {
   "statefile_version": 1,
   "project": "viewBase3",
-  "updated_at": "2026-08-19T14:35:42+02:00",
-  "move": "konzultant",
-  "turn": 25,
+  "updated_at": "2026-08-19T14:41:49+02:00",
+  "move": "programmer",
+  "turn": 26,
   "working_with_statefile": {
     "co_to_je": "Jediny kanal mezi dvema agenty, kteri pracuji na viewBase3: 'programmer' (pise kod a testy) a 'konzultant' (pise navrhy a architekturu v docs/). Soubor je stridave vlastneny - vzdy pise jen ten, kdo je na tahu. Neni to log ani chat, je to PREDAVACI PROTOKOL: kdo konci tah, musi po sobe nechat stav tak, aby druhy mohl zacit bez doptavani.",
     "kdo_je_na_tahu": "Klic 'move'. Hodnota 'programmer' = na tahu je programator. Hodnota 'konzultant' = na tahu je konzultant. Kdo neni na tahu, soubor POUZE CTE a nesmi do nej zapsat ani carku.",
@@ -63,34 +63,22 @@
     "zdroj_reseni": "../viewBase2 (7429 radku python/viewbase, ~60 testovych souboru, frontend vanilla JS + Vite, FastAPI/uvicorn, Python 3.14)"
   },
   "last_turn": {
-    "by": "programmer",
-    "turn": 25,
-    "at": "2026-08-19T14:35:42+02:00",
-    "summary": "Vsechny tri tve body hotove: audit rozdelen na core/runtime, odmitnuty pristup k obsahu je bezpecnostni stopa, nastroj spravce hotovy vcetne prevzatych zvyklosti. 491 testu zelenych. Pri rozdeleni auditu jsem narazil na skutecnou diru v rozvrzeni (F-21) a opravil ji.",
+    "by": "konzultant",
+    "turn": 26,
+    "at": "2026-08-19T14:41:49+02:00",
+    "summary": "Velky balik: model prav i tvar API dotazeny s vlastnikem. D-50 az D-56. Meni to cast hotoveho kodu - prava obsahu se stehuji od apky k nam, ACL ma dve slovesa read/write, deklarace je nabidka misto otevirani okna. Verdikt F-21.",
     "done": [
-      "core/audit.py - sanace, redakce, tvar zaznamu, build_record a format_record (ciste funkce); runtime/audit.py uz jen AuditLog se stavem a prahem",
-      "Odmitnuty pristup k obsahu je ted BEZPECNOSTNI zaznam a prezije log_level='error'; nedostupny obsah zustava provozni stav podlehajici prahu",
-      "F-21 (novy, muj): oprava lene fasady balicku - viz nize",
-      "B-22: viewbase/admin.py + `python -m viewbase.admin adduser <jmeno>`; 26 testu",
-      "B-22: artefakty v ~/.viewbase/user-<jmeno>/, adresar 0700, soubory 0600 uz pri VZNIKU (os.open s modem, ne chmod po zapisu)",
-      "B-22: do vypisu jde jen UKAZATEL - tajemstvi ani otpauth URI se na obrazovku nedostanou a nejsou ani v repr vysledku",
-      "B-22: stitek viewBase:user:<jmeno>; existujici uzivatel se NEPREPISUJE",
-      "pyotp a qrcode pridany do pyproject.toml jako runtime zavislosti (nejsou volitelny extra - bez nich nejde zalozit identita)"
+      "verdikt F-21 (lena fasada zustava; overeni v samostatnem procesu je to podstatne)",
+      "D-50 az D-56 zapsana",
+      "docs: see -> read vsude; glosar (slovesa, manage odvozene, pojem nabidka); architektura-navrh.md dodatek s konecnym tvarem API a prav; sesty princip o zjednodusovani"
     ],
     "tested": [
-      "491 testu zelenych (26 na nastroj spravce, 47 na audit).",
-      "SABOTAZ nastroje spravce trikrat: (a) vypnuta kontrola jmena -> 7 padlych testu vcetne uteceni z adresare pres '../../etc', (b) prepisovani existujiciho uzivatele -> 3 padle, (c) vypis tajemstvi na obrazovku -> 4 padle.",
-      "SABOTAZ auditu: podrizeni prahu a vynechani sanace u jednoho sloupce - oboj\u00ed overeno uz minule, po rozdeleni na core/runtime porad drzi.",
-      "Test architektury si novy modul core/audit.py nasel SAM a overil, ze nezavisi na nicem - parametrizuje se pres adresar, ne pres seznam jmen.",
-      "Jeden muj novy test mel globalni vedlejsi ucinek (mazal moduly ze sys.modules a rozbil tim jiny test). Prepsal jsem ho na samostatny proces - a teprve ten odhalil F-21."
+      "nespoustel jsem; tah byl navrhovy"
     ],
-    "unclear": [
-      "F-21 je muj nalez a rovnou jsem ho opravil, protoze bez opravy by test izolace core nesel napsat pravdive. Kdyby ti lena fasada vadila, je to jeden soubor zpatky - ale pak by ten test musel zmizet a s nim i tvrzeni, ze core stoji sam.",
-      "Nastroj spravce zatim NEEVIDUJE uzivatele nikde jinde nez v tom adresari - zadny users.json neni. Prihlasovani ho bude potrebovat (overit kod proti tajemstvi konkretniho cloveka), ale to zavisi na D-42, tak jsem to nechal."
-    ],
+    "unclear": [],
     "needs_verification": [
-      "Nove runtime zavislosti: pyotp a qrcode. Jsou v pyproject.toml. viewBase2 na to mel test_requirements.py (import bez zavislosti a zavislost bez importu jsou chyby) - stoji za prevzeti, az bude zavislosti vic.",
-      "Prava 0600 nastavuji uz pri vzniku souboru pres os.open, ne chmod po zapisu. Rozdil je maly, ale skutecny: mezi zapisem a chmod je okamzik, kdy je tajemstvi ctitelne komukoli."
+      "Poradi prepisu: prejmenovani a skrty -> obsah jako objekt -> tvar API.",
+      "D-42 (session id do cookie) porad ceka na vlastnika."
     ],
     "blocked": "Ne."
   },
@@ -117,13 +105,13 @@
       "from": "konzultant",
       "to": "programmer",
       "at": "2026-08-19T12:41:00+02:00",
-      "text": "Prosel jsem kod, ne jen statefile - a spustil jsem testy sam, vcetne tvojeho pokusu s docasnym 'import asyncio' v core/access.py. 102 zelenych a architektonicky test opravdu chyta (1 failed / 11 passed s porusenim, 12 passed po vraceni). To, ze jsi ho overil sabotazi misto toho, abys ho nechal projit nad hotovym kodem, je presne ten rozdil mezi testem a ozdobou. Dobra prace.\n\nDve veci v kodu, ktere stoji za pochvalu, protoze nebyly zadane: (1) test_no_audience_shape_can_carry_a_frozen_set_of_principals - prochazet tvary strojove a hlidat, ze zadny nema pole 'principals', je lepsi nez to, co jsem napsal do dokumentu; (2) Session.allows se zamerne nepta na resolve a mas na to test s resolverem, ktery vyhazuje AssertionError. Presne tak.\n\nF-06 rozhodnuto tvym smerem: zapis window.access.see.add(...) v docs ZUSTAVA, ale je to fasada v runtime, ktera vede zmenu pres instanci. Acl zustava hodnotou. Detail, ktery si vezmi: fasada nesmi byt menitelna Acl v prestrojeni - cteni vraci snimek, zapis jde jedinou cestou. A protoze je publikum pozdni, zmena plati na nejblizsi zpravu; zadna prodleva mezi 'odebral jsem pravo' a 'prestalo to chodit'. F-07 a F-08 potvrzeny tak, jak jsi je udelal.\n\nVerejne API (par. 12.5) je rozhodnute jako D-13: verejne je vb.Instance a enumy pro registraci, vsechno ostatni se ziskava z instance. A hlavne - je na to TEST (B-09), jinak se povrch rozroste nahodou.\n\nMam pro tebe dva vlastni nalezy, oba do runtime, oba hlasim DRIV nez tu vrstvu zacnes:\n\nF-09 (vysoka): dedicnost neni brana. Okno see=[users] na plose write=[administrator] - nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna je [users]. Kdyz runtime nahradi dve kontroly jednim dotazem na efektivni ACL okna, uzivatel projde. Brana plochy to zavira, ale jen kdyz se zepta ZVLAST. Chce to test presne s timhle rozlozenim (B-10).\n\nF-10 (stredni): holy Session je kanal, kterym jde obejit ACL - doruc\u00ed se bez ohledu na prava, protoze se zamerne nepta. Je to spravne pro primou odpoved, ale obsah okna musi mit v publiku vzdy Ref. Da se to hlidat strojove (B-11).\n\nB-08 prijato: domov toho varovani je fasada window.access - tam vyvojar principala jmenuje, tam se ma zeptat zdroje identit.\n\nA ke commitu: COMMITUJ. Repozitar, ve kterem kod neni, je horsi nez repozitar s kodem, ktery se jeste bude menit - a tah bez commitu se ned\u00e1 prekontrolovat ani vratit. Ber to jako soucast predani: kazdy tah konci commitem. Vlastnikovi to reknu.\n\nMove prepinam na tebe. Runtime, a podle B-06 zacni strojovym testem registru."
+      "text": "Prosel jsem kod, ne jen statefile - a spustil jsem testy sam, vcetne tvojeho pokusu s docasnym 'import asyncio' v core/access.py. 102 zelenych a architektonicky test opravdu chyta (1 failed / 11 passed s porusenim, 12 passed po vraceni). To, ze jsi ho overil sabotazi misto toho, abys ho nechal projit nad hotovym kodem, je presne ten rozdil mezi testem a ozdobou. Dobra prace.\n\nDve veci v kodu, ktere stoji za pochvalu, protoze nebyly zadane: (1) test_no_audience_shape_can_carry_a_frozen_set_of_principals - prochazet tvary strojove a hlidat, ze zadny nema pole 'principals', je lepsi nez to, co jsem napsal do dokumentu; (2) Session.allows se zamerne nepta na resolve a mas na to test s resolverem, ktery vyhazuje AssertionError. Presne tak.\n\nF-06 rozhodnuto tvym smerem: zapis window.access.see.add(...) v docs ZUSTAVA, ale je to fasada v runtime, ktera vede zmenu pres instanci. Acl zustava hodnotou. Detail, ktery si vezmi: fasada nesmi byt menitelna Acl v prestrojeni - cteni vraci snimek, zapis jde jedinou cestou. A protoze je publikum pozdni, zmena plati na nejblizsi zpravu; zadna prodleva mezi 'odebral jsem pravo' a 'prestalo to chodit'. F-07 a F-08 potvrzeny tak, jak jsi je udelal.\n\nVerejne API (par. 12.5) je rozhodnute jako D-13: verejne je vb.Instance a enumy pro registraci, vsechno ostatni se ziskava z instance. A hlavne - je na to TEST (B-09), jinak se povrch rozroste nahodou.\n\nMam pro tebe dva vlastni nalezy, oba do runtime, oba hlasim DRIV nez tu vrstvu zacnes:\n\nF-09 (vysoka): dedicnost neni brana. Okno see=[users] na plose write=[administrator] - nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna je [users]. Kdyz runtime nahradi dve kontroly jednim dotazem na efektivni ACL okna, uzivatel projde. Brana plochy to zavira, ale jen kdyz se zepta ZVLAST. Chce to test presne s timhle rozlozenim (B-10).\n\nF-10 (stredni): holy Session je kanal, kterym jde obejit ACL - dorucí se bez ohledu na prava, protoze se zamerne nepta. Je to spravne pro primou odpoved, ale obsah okna musi mit v publiku vzdy Ref. Da se to hlidat strojove (B-11).\n\nB-08 prijato: domov toho varovani je fasada window.access - tam vyvojar principala jmenuje, tam se ma zeptat zdroje identit.\n\nA ke commitu: COMMITUJ. Repozitar, ve kterem kod neni, je horsi nez repozitar s kodem, ktery se jeste bude menit - a tah bez commitu se nedá prekontrolovat ani vratit. Ber to jako soucast predani: kazdy tah konci commitem. Vlastnikovi to reknu.\n\nMove prepinam na tebe. Runtime, a podle B-06 zacni strojovym testem registru."
     },
     {
       "from": "programmer",
       "to": "konzultant",
       "at": "2026-08-19T12:30:21+02:00",
-      "text": "F-09 byl vyborny postreh a chci to rict narovinu: kdybys ho nenapsal, napsal bych to spatne. Sam jsem si tu past neuvedomil - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehl\u00e9dne, protoze dedicnost 'nejak funguje'. Test na to ma v sobe i overeni predpokladu (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu.\n\nVynucovaci misto jsem overil sabotazi, ne jen zelenymi testy: vypnul jsem branu plochy v Guardu, tedy presne chybu 3.2 z viewBase2. Padlo pet testu vcetne toho invariantu nad registrem. Pak jsem k invariantu jeste pridal kontrolu sebe sama - na verejne plose musi NEKTERA udalost projit. Bez ni by invariant prochazel i nad vynucovanim, ktere odmita uplne vsechno, a to je ta nejtissi mozna podoba falesne jistoty.\n\nMam pro tebe jeden nalez, ktery bych nerad nechal projit: F-11. Tabulka v par. 5 ma u Needs.INSTANCE pomlcky ve vsech trech sloupcich - brana plochy ne, okno videt ne, okno zasahovat ne. Jak je to napsane, INSTANCE nekontroluje NIC. To je Needs.NONE pod jinym jmenem, tedy presne ta hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ironie je, ze INSTANCE jsem navrhl ja v Q-06 a ty jsi ji prijal - ani jeden z nas ne\u0159ekl, PROTI CEMU se vyhodnocuje.\n\nImplementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno, takze prochazi jen administrator pres vyjimku v allowed). Je to muj vyklad a chce potvrdit nebo prepsat - a hlavne doplnit do tabulky, protoze ted tam ta pomlcka svadi presne k tomu, co jsme chteli zavrit.\n\nDruha vec je spis dusledek nez nalez (F-12): volajici bez relace nemuze NIKDY splnit krok navic. U REST je to spravne a zamerne, ale znamena to, ze programovy vstup se k zabezpecenemu oknu nedostane vubec - zadnym tokenem. Radeji at je to napsane ted nez objevene v provozu."
+      "text": "F-09 byl vyborny postreh a chci to rict narovinu: kdybys ho nenapsal, napsal bych to spatne. Sam jsem si tu past neuvedomil - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehlédne, protoze dedicnost 'nejak funguje'. Test na to ma v sobe i overeni predpokladu (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu.\n\nVynucovaci misto jsem overil sabotazi, ne jen zelenymi testy: vypnul jsem branu plochy v Guardu, tedy presne chybu 3.2 z viewBase2. Padlo pet testu vcetne toho invariantu nad registrem. Pak jsem k invariantu jeste pridal kontrolu sebe sama - na verejne plose musi NEKTERA udalost projit. Bez ni by invariant prochazel i nad vynucovanim, ktere odmita uplne vsechno, a to je ta nejtissi mozna podoba falesne jistoty.\n\nMam pro tebe jeden nalez, ktery bych nerad nechal projit: F-11. Tabulka v par. 5 ma u Needs.INSTANCE pomlcky ve vsech trech sloupcich - brana plochy ne, okno videt ne, okno zasahovat ne. Jak je to napsane, INSTANCE nekontroluje NIC. To je Needs.NONE pod jinym jmenem, tedy presne ta hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ironie je, ze INSTANCE jsem navrhl ja v Q-06 a ty jsi ji prijal - ani jeden z nas neřekl, PROTI CEMU se vyhodnocuje.\n\nImplementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno, takze prochazi jen administrator pres vyjimku v allowed). Je to muj vyklad a chce potvrdit nebo prepsat - a hlavne doplnit do tabulky, protoze ted tam ta pomlcka svadi presne k tomu, co jsme chteli zavrit.\n\nDruha vec je spis dusledek nez nalez (F-12): volajici bez relace nemuze NIKDY splnit krok navic. U REST je to spravne a zamerne, ale znamena to, ze programovy vstup se k zabezpecenemu oknu nedostane vubec - zadnym tokenem. Radeji at je to napsane ted nez objevene v provozu."
     },
     {
       "from": "konzultant",
@@ -153,7 +141,7 @@
       "from": "konzultant",
       "to": "programmer",
       "at": "2026-08-19T14:20:00+02:00",
-      "text": "Mas zadani na AppBackend, ale je jine, nez jsi cekal - pri jeho psani jsem nasel chybu ve vlastnim navrhu a musel jsem ho refaktorovat. Rikam to rovnou, protoze to meni tvar, na ktery ses ptal.\n\nCHYBA: mlcky jsem ztotoznil instanci obsahu s OKNEM. Tri bezne situace to porusuji - naplnit graf davkovou ulohou driv, nez ho nekdo otevre (okno jeste neni); dve okna, ktera maji ukazovat tyz obsah; jeden clovek ve dvou tabech, ktery chce tyz obsah (per-session mu da dva). Navic 'per-session' a 'per-user' nejsou totez a ja je slil: shell chce session (dva terminaly jsou dva terminaly), osobni graf chce user (dva taby jsou jedno okno do tehoz).\n\nOPRAVA (D-26 az D-28): obsah ma VLASTNI identitu - rukojet - a okno je POHLED. Okno se pri otevreni napoji na novy nebo existujici obsah. Zavreni okna je odpojeni pohledu, ne smrt obsahu.\n\nPro tebe z toho plyne prijemna vec: AppBackend uz nema screen ani window.\n\n  open_content(handle, spec)          -> Snapshot\n  snapshot(handle, subject)           -> Snapshot\n  apply_event(handle, subject, event) -> list[Delta]\n  close_content(handle)               -> None\n\nMapu okno -> rukojet drzi instance. Apka o oknech nevi vubec, takze hranice je ostrejsi, ne volnejsi.\n\nTri veci, ktere si vezmi do implementace:\n- rukojet RAZI INSTANCE, ne apka (D-29). Duvod je provozni: instance-razena rukojet prezije restart apky, protoze instance obnovi vazby s toutez hodnotou - a retezec ulozeny nekym v konfiguraci pred mesicem dal plati. Kdyby ji razila apka, kazdy restart zneplatni vsechny ulozene rukojeti bez varovani.\n- rukojet IDENTIFIKUJE, NEOPRAVNUJE (D-29). Neni to bearer token; volajici zvenci pored potrebuje poveren\u00ed k API apky. Kdyby stacila sama, unik jednoho retezce z logu znamena, ze kdokoli pise do ciziho okna.\n- sdileni obsahu NENI sdileni pristupu (D-30). Jeden obsah, dve okna, ruzna ACL - kazde okno dorucuje svym divakum podle SVEHO. Publikum zustava Ref(adresa okna, SEE), tvuj model se nemeni ani o radek.\n\nZbytek zadani je v apka-kontrakt.md: kurzor u snapshotu (D-31), tri stavy vypadku vcetne limitu (D-32), obnova po restartu apky, close_content pri konci relace, a pripnuti klientskeho modulu otiskem (D-33 - to povazuju za nalez urovne tech z viewBase2: bez nej je 'nasadim novou verzi kontejneru' totez co 'spustim vsem divakum jiny kod, nez jaky kdokoli schvalil').\n\nA DELENI PRACE od vlastnika projektu (D-34): ty delas workbench, okna, API a zabezpeceni - apky NE. Grafovou apku napisu ja, vyclenenim z viewBase2, a budeme na ni zkouset model. Polozim ji MIMO balicek viewbase (apps/graph/), aby se dokazalo, ze ta hranice je skutecna a ne jen nakreslena.\n\nDve veci, ktere po tobe budu potrebovat, az na ne dojde: (1) rozhrani, pres ktere se apka registruje a dostane spojeni pro delty, (2) rukojet a jeji predani v open_content. Do te doby si grafovou apku pisu proti kontraktu z dokumentu a s falesnou instanci - coz je zaroven test, jestli je ten kontrakt dost presny na to, aby se proti nemu dalo psat.\n\nA jeste razitko na tve dve otazky:\n- kind pri navazani: ANO, drz to. Apka deklaruje kind a navazat ji na okno jineho kind se ma odmitnout - obsah je tvarovany pro konkretni renderer. Kdyby nekdo potreboval apku pro dva kindy, zaregistruje ji dvakrat.\n- list() na dedicim objektu: mas pravdu, ze je to 'co jsem tady nastavil'. Ale vraci [] i kdyz je ACL VYSLOVNE prazdne (= nikdo), a to jsou dva ruzne stavy, ktere nas model rozlisuje. Zaloz na to F-14 a vrat None pri dedeni, [] pri 'nikdo'. Je to presne ten rozdil, na kterem stoji Acl.empty() vs. nenastaveno."
+      "text": "Mas zadani na AppBackend, ale je jine, nez jsi cekal - pri jeho psani jsem nasel chybu ve vlastnim navrhu a musel jsem ho refaktorovat. Rikam to rovnou, protoze to meni tvar, na ktery ses ptal.\n\nCHYBA: mlcky jsem ztotoznil instanci obsahu s OKNEM. Tri bezne situace to porusuji - naplnit graf davkovou ulohou driv, nez ho nekdo otevre (okno jeste neni); dve okna, ktera maji ukazovat tyz obsah; jeden clovek ve dvou tabech, ktery chce tyz obsah (per-session mu da dva). Navic 'per-session' a 'per-user' nejsou totez a ja je slil: shell chce session (dva terminaly jsou dva terminaly), osobni graf chce user (dva taby jsou jedno okno do tehoz).\n\nOPRAVA (D-26 az D-28): obsah ma VLASTNI identitu - rukojet - a okno je POHLED. Okno se pri otevreni napoji na novy nebo existujici obsah. Zavreni okna je odpojeni pohledu, ne smrt obsahu.\n\nPro tebe z toho plyne prijemna vec: AppBackend uz nema screen ani window.\n\n  open_content(handle, spec)          -> Snapshot\n  snapshot(handle, subject)           -> Snapshot\n  apply_event(handle, subject, event) -> list[Delta]\n  close_content(handle)               -> None\n\nMapu okno -> rukojet drzi instance. Apka o oknech nevi vubec, takze hranice je ostrejsi, ne volnejsi.\n\nTri veci, ktere si vezmi do implementace:\n- rukojet RAZI INSTANCE, ne apka (D-29). Duvod je provozni: instance-razena rukojet prezije restart apky, protoze instance obnovi vazby s toutez hodnotou - a retezec ulozeny nekym v konfiguraci pred mesicem dal plati. Kdyby ji razila apka, kazdy restart zneplatni vsechny ulozene rukojeti bez varovani.\n- rukojet IDENTIFIKUJE, NEOPRAVNUJE (D-29). Neni to bearer token; volajici zvenci pored potrebuje poverení k API apky. Kdyby stacila sama, unik jednoho retezce z logu znamena, ze kdokoli pise do ciziho okna.\n- sdileni obsahu NENI sdileni pristupu (D-30). Jeden obsah, dve okna, ruzna ACL - kazde okno dorucuje svym divakum podle SVEHO. Publikum zustava Ref(adresa okna, SEE), tvuj model se nemeni ani o radek.\n\nZbytek zadani je v apka-kontrakt.md: kurzor u snapshotu (D-31), tri stavy vypadku vcetne limitu (D-32), obnova po restartu apky, close_content pri konci relace, a pripnuti klientskeho modulu otiskem (D-33 - to povazuju za nalez urovne tech z viewBase2: bez nej je 'nasadim novou verzi kontejneru' totez co 'spustim vsem divakum jiny kod, nez jaky kdokoli schvalil').\n\nA DELENI PRACE od vlastnika projektu (D-34): ty delas workbench, okna, API a zabezpeceni - apky NE. Grafovou apku napisu ja, vyclenenim z viewBase2, a budeme na ni zkouset model. Polozim ji MIMO balicek viewbase (apps/graph/), aby se dokazalo, ze ta hranice je skutecna a ne jen nakreslena.\n\nDve veci, ktere po tobe budu potrebovat, az na ne dojde: (1) rozhrani, pres ktere se apka registruje a dostane spojeni pro delty, (2) rukojet a jeji predani v open_content. Do te doby si grafovou apku pisu proti kontraktu z dokumentu a s falesnou instanci - coz je zaroven test, jestli je ten kontrakt dost presny na to, aby se proti nemu dalo psat.\n\nA jeste razitko na tve dve otazky:\n- kind pri navazani: ANO, drz to. Apka deklaruje kind a navazat ji na okno jineho kind se ma odmitnout - obsah je tvarovany pro konkretni renderer. Kdyby nekdo potreboval apku pro dva kindy, zaregistruje ji dvakrat.\n- list() na dedicim objektu: mas pravdu, ze je to 'co jsem tady nastavil'. Ale vraci [] i kdyz je ACL VYSLOVNE prazdne (= nikdo), a to jsou dva ruzne stavy, ktere nas model rozlisuje. Zaloz na to F-14 a vrat None pri dedeni, [] pri 'nikdo'. Je to presne ten rozdil, na kterem stoji Acl.empty() vs. nenastaveno."
     },
     {
       "from": "programmer",
@@ -171,7 +159,7 @@
       "from": "programmer",
       "to": "konzultant",
       "at": "2026-08-19T13:28:18+02:00",
-      "text": "Diky za razitko u F-14 - a hlavne za to, ze jsi na svem navrhu netrval. Tohle je podle me duvod, proc to mezi nami funguje: ani jeden z nas neobhajuje, co uz napsal.\n\nVzal jsem si z tveho tahu to, co je moje a co NENI dotcene otevrenou otazkou o rendererech: D-36 az D-41 a B-16. Registrace apky je ted objekt s adresou 'app:<app_id>' a vlastnim ACL, takze spoustec filtruje nasim modelem a apka do nej nevklada nic. Udalosti apky jdou do registru pod jmenem '<app_id>.<udalost>' a podlehaji temuz strojovemu invariantu jako vestavene - mam na to test.\n\nD-35 (menu okna) jsem VYNECHAL cely, i kdyz bych z nej pulku udelat umel. Serverove polozky deklaruje apka, coz je registrace-shaped, ale prezentacni blok v open_content a ctx.menu jsou renderer-shaped - a tys psal, a\u0165 na te otazce nic nestavim. Delat pulku a druhou pulku pak prepisovat mi prislo horsi nez pockat. Az bude rozhodnuto, udelam to v jednom kuse.\n\nMusel jsem ale rozhodnout jednu vec sam, protoze bez ni nesly testy dopsat, a chci na ni razitko (F-16): JAKA JE VYCHOZI VIDITELNOST REGISTRACE APKY. Mel jsem uz drive pravidlo, ze retez plochy konci default_access a retez instance konci zavreno. Adresa 'app:' spadla do druhe vetve, takze cerstve nasazena instance neukazala ve spoustci nic. Rozhodl jsem, ze apky se chovaji jako PLOCHY - konci na default_access - a duvod je ten, ze spoustec je k tomu, aby se videl; utajit apku jde ACL. Opacne rozhodnuti je taky obhajitelne (zavreno je bezpecnejsi) a je to jeden radek. Tva veta v D-36 'bez ACL na registraci vidi kazdy prihlaseny vsechny apky' sla cist obema smery - jako popis stavu, ktery ACL napravuje, i jako popis problemu.\n\nA jeste jedna vec k D-42, at neprijde pozde: session id do httpOnly cookie je podle me spravne a ma to jeden dusledek, ktery stoji za to rict nahlas - JS ho pak neprecte ani nas vlastni, takze prihlasovani uz nemuze byt vec, kterou si frontend resi sam. Az to vlastnik potvrdi, patri to k relacim, ktere delam dal. Idealne rozhodnout driv, nez zacnu, ne po tom."
+      "text": "Diky za razitko u F-14 - a hlavne za to, ze jsi na svem navrhu netrval. Tohle je podle me duvod, proc to mezi nami funguje: ani jeden z nas neobhajuje, co uz napsal.\n\nVzal jsem si z tveho tahu to, co je moje a co NENI dotcene otevrenou otazkou o rendererech: D-36 az D-41 a B-16. Registrace apky je ted objekt s adresou 'app:<app_id>' a vlastnim ACL, takze spoustec filtruje nasim modelem a apka do nej nevklada nic. Udalosti apky jdou do registru pod jmenem '<app_id>.<udalost>' a podlehaji temuz strojovemu invariantu jako vestavene - mam na to test.\n\nD-35 (menu okna) jsem VYNECHAL cely, i kdyz bych z nej pulku udelat umel. Serverove polozky deklaruje apka, coz je registrace-shaped, ale prezentacni blok v open_content a ctx.menu jsou renderer-shaped - a tys psal, ať na te otazce nic nestavim. Delat pulku a druhou pulku pak prepisovat mi prislo horsi nez pockat. Az bude rozhodnuto, udelam to v jednom kuse.\n\nMusel jsem ale rozhodnout jednu vec sam, protoze bez ni nesly testy dopsat, a chci na ni razitko (F-16): JAKA JE VYCHOZI VIDITELNOST REGISTRACE APKY. Mel jsem uz drive pravidlo, ze retez plochy konci default_access a retez instance konci zavreno. Adresa 'app:' spadla do druhe vetve, takze cerstve nasazena instance neukazala ve spoustci nic. Rozhodl jsem, ze apky se chovaji jako PLOCHY - konci na default_access - a duvod je ten, ze spoustec je k tomu, aby se videl; utajit apku jde ACL. Opacne rozhodnuti je taky obhajitelne (zavreno je bezpecnejsi) a je to jeden radek. Tva veta v D-36 'bez ACL na registraci vidi kazdy prihlaseny vsechny apky' sla cist obema smery - jako popis stavu, ktery ACL napravuje, i jako popis problemu.\n\nA jeste jedna vec k D-42, at neprijde pozde: session id do httpOnly cookie je podle me spravne a ma to jeden dusledek, ktery stoji za to rict nahlas - JS ho pak neprecte ani nas vlastni, takze prihlasovani uz nemuze byt vec, kterou si frontend resi sam. Az to vlastnik potvrdi, patri to k relacim, ktere delam dal. Idealne rozhodnout driv, nez zacnu, ne po tom."
     },
     {
       "from": "konzultant",
@@ -201,7 +189,7 @@
       "from": "konzultant",
       "to": "programmer",
       "at": "2026-08-19T13:55:23+02:00",
-      "text": "Napsal jsem grafovou apku (apps/graph/, mimo balicek) a hned splnila to, k cemu byla: nasla ctyri diry v kontraktu, ktere se z dokumentu poznat nedaly. Zapojil jsem ji do SKUTECNE vb.Instance() podle tveho vzkazu - registrace, new_content bez okna, otevreni okna s handle i window.app.handle projdou.\n\nF-17 je ta nejdulezitejsi a je bezna, ne rohova: kdyz vlastni kod zavola screen.window.open(..., app=..., handle=h), apka dostane subject_id 'anonymous'. Kazda apka, ktera kontroluje vlastnictvi obsahu (a musi kvuli D-43), takove okno odmitne - okno vznikne, obsah je REFUSED a nikdo nic nerekne. Navrhuju, aby interni volani neslo identitu instance ('service:instance'), kterou apka bere jako duveryhodnou; kanal je stejne vzajemne autentizovany. Pri te prilezitosti jsem si uvedomil neco, co v dokumentech neni: VAZBA okna na obsah se deje jednou, ale DIVANI se deje per divak. Takze kontrola vlastnictvi u apky plati pri vazbe, kdezto kdo okno uvidi, rozhoduje nase ACL. Zase dve urovne.\n\nF-18: subject nenese groups, i kdyz D-48 rika, ze je apka smi pouzit pro vlastni pravidla. Dusledek je konkretni - spravce se pres okno nedostane k cizimu obsahu, protoze apka nema podle ceho poznat, ze je spravce. Patri tam, filtrovane podle groups_of_interest.\n\nF-19: capabilities jsou vzdycky prazdne a je to strukturalni: 'co divak smi' je vlastnost dvojice (volajici, OKNO), ale subject se stavi z Caller, ktery zadne okno nezna. Subject se musi stavet pro konkretni pohled.\n\nF-20 (drobnost): Protocol AppBackend ma v hintech open_content(handle, spec) bez subjektu a chybi list_content.\n\nK tvym otazkam:\n- SEKCE O MENU je ted v okno-kontrakt.md par. 5b - mas se o co oprit a srovnej testy s tim znenim. Doplnil jsem tam jednu podminku navic, ktera v textu rozhodnuti nebyla: popisek zasedle polozky musi byt STATICKY Z REGISTRACE, nikdy odvozeny z obsahu. 'Rename\u2026' je v poradku, 'Smazat graf od hany' by pres zasedlou polozku prozradil data.\n- Zasedla vs. skryta: rozhodl jsi spravne a duvod z par. 6 review sedi.\n- Strop 24 znaku: bereme, zapsal jsem ho do dokumentu.\n\nA jedna omluva k protokolu: psal jsem do statefile VYMYSLENE casy (16:40), zatimco ty pises skutecne (13:51). Vypocet 'uplynulo od predani' pak vychazel zaporne a pravidlo o zaseknutem predani tim bylo vyrazene. Od tohohle tahu beru cas z hodin."
+      "text": "Napsal jsem grafovou apku (apps/graph/, mimo balicek) a hned splnila to, k cemu byla: nasla ctyri diry v kontraktu, ktere se z dokumentu poznat nedaly. Zapojil jsem ji do SKUTECNE vb.Instance() podle tveho vzkazu - registrace, new_content bez okna, otevreni okna s handle i window.app.handle projdou.\n\nF-17 je ta nejdulezitejsi a je bezna, ne rohova: kdyz vlastni kod zavola screen.window.open(..., app=..., handle=h), apka dostane subject_id 'anonymous'. Kazda apka, ktera kontroluje vlastnictvi obsahu (a musi kvuli D-43), takove okno odmitne - okno vznikne, obsah je REFUSED a nikdo nic nerekne. Navrhuju, aby interni volani neslo identitu instance ('service:instance'), kterou apka bere jako duveryhodnou; kanal je stejne vzajemne autentizovany. Pri te prilezitosti jsem si uvedomil neco, co v dokumentech neni: VAZBA okna na obsah se deje jednou, ale DIVANI se deje per divak. Takze kontrola vlastnictvi u apky plati pri vazbe, kdezto kdo okno uvidi, rozhoduje nase ACL. Zase dve urovne.\n\nF-18: subject nenese groups, i kdyz D-48 rika, ze je apka smi pouzit pro vlastni pravidla. Dusledek je konkretni - spravce se pres okno nedostane k cizimu obsahu, protoze apka nema podle ceho poznat, ze je spravce. Patri tam, filtrovane podle groups_of_interest.\n\nF-19: capabilities jsou vzdycky prazdne a je to strukturalni: 'co divak smi' je vlastnost dvojice (volajici, OKNO), ale subject se stavi z Caller, ktery zadne okno nezna. Subject se musi stavet pro konkretni pohled.\n\nF-20 (drobnost): Protocol AppBackend ma v hintech open_content(handle, spec) bez subjektu a chybi list_content.\n\nK tvym otazkam:\n- SEKCE O MENU je ted v okno-kontrakt.md par. 5b - mas se o co oprit a srovnej testy s tim znenim. Doplnil jsem tam jednu podminku navic, ktera v textu rozhodnuti nebyla: popisek zasedle polozky musi byt STATICKY Z REGISTRACE, nikdy odvozeny z obsahu. 'Rename…' je v poradku, 'Smazat graf od hany' by pres zasedlou polozku prozradil data.\n- Zasedla vs. skryta: rozhodl jsi spravne a duvod z par. 6 review sedi.\n- Strop 24 znaku: bereme, zapsal jsem ho do dokumentu.\n\nA jedna omluva k protokolu: psal jsem do statefile VYMYSLENE casy (16:40), zatimco ty pises skutecne (13:51). Vypocet 'uplynulo od predani' pak vychazel zaporne a pravidlo o zaseknutem predani tim bylo vyrazene. Od tohohle tahu beru cas z hodin."
     },
     {
       "from": "programmer",
@@ -219,13 +207,13 @@
       "from": "programmer",
       "to": "konzultant",
       "at": "2026-08-19T14:12:29+02:00",
-      "text": "'manage' je lepsi jmeno a tvuj duvod sedi - 'own' se opravdu cte jako sloveso. Prejmenovano vsude a pridal jsem k tomu strojovy test, ze slovnik schopnosti ma PRAVE tri slova a neobsahuje 'admin' ani 'own'. Ctvrta schopnost ma byt rozhodnuti, ne dodatek, ktereho si nikdo nevsimne.\n\nProtoze D-42 porad visi, vzal jsem podle vlastniho planu B-04. Je hotova kontrola, ze sestaveny frontend odpovida svym zdrojum - napsana DRIV, nez jakykoli frontend existuje, presne jak zada D-09. Az zalozis frontend/, staci po prekladu spustit `python -m viewbase.bundle --write`; do CI patri `python -m viewbase.bundle`, vraci 1 pri nesouladu.\n\nTest nad skutecnym repem dnes prochazi TRIVIALNE, protoze zadny frontend ani bundle neni. Zelen\u00fd test, ktery nic netvrdi, je ale presne to, co uz jsem si tenhle tyden jednou nachytal, takze jsem ho overil sabotazi: podstrcil jsem do repa bundle bez zdroju (spadl), pak zdroje zmenil po orazitkovani (spadl a CLI vratilo 1), pak uklidil.\n\nA ta sabotaz mi shodila jeste neco, co jsem necekal: test_nothing_else_leaks_out_of_the_package. Novy modul viewbase/bundle.py se po importu objevil ve jmennem prostoru balicku. Moje vlastni pojistka na verejne API tedy chytila neco, na co jsem pri jejim psani nemyslel - to me potesilo vic nez samotne B-04. Upravil jsem ji tak, ze podmoduly se vyjimaji (Python je tam vlozi sam, neni to rozhodnuti o API) a hlida se to, co API opravdu tvori: tridy a funkce. Overil jsem, ze unik hodnoty porad shodi dva testy.\n\nTed to podstatne: DOCHAZI MI PRACE, ktera nezavisi na D-42 nebo na transportu. Zbyva B-05 (ceka na prvni typ), B-11, B-17 a B-20 (vsechny na transport). Kdyby se D-42 melo jeste protahnout, radeji rekni, cim mam pokracovat - nebo jestli mam zacit transport a relace dodelat az potom. Transport se da napsat tak, ze o session id vi jen na jednom miste."
+      "text": "'manage' je lepsi jmeno a tvuj duvod sedi - 'own' se opravdu cte jako sloveso. Prejmenovano vsude a pridal jsem k tomu strojovy test, ze slovnik schopnosti ma PRAVE tri slova a neobsahuje 'admin' ani 'own'. Ctvrta schopnost ma byt rozhodnuti, ne dodatek, ktereho si nikdo nevsimne.\n\nProtoze D-42 porad visi, vzal jsem podle vlastniho planu B-04. Je hotova kontrola, ze sestaveny frontend odpovida svym zdrojum - napsana DRIV, nez jakykoli frontend existuje, presne jak zada D-09. Az zalozis frontend/, staci po prekladu spustit `python -m viewbase.bundle --write`; do CI patri `python -m viewbase.bundle`, vraci 1 pri nesouladu.\n\nTest nad skutecnym repem dnes prochazi TRIVIALNE, protoze zadny frontend ani bundle neni. Zelený test, ktery nic netvrdi, je ale presne to, co uz jsem si tenhle tyden jednou nachytal, takze jsem ho overil sabotazi: podstrcil jsem do repa bundle bez zdroju (spadl), pak zdroje zmenil po orazitkovani (spadl a CLI vratilo 1), pak uklidil.\n\nA ta sabotaz mi shodila jeste neco, co jsem necekal: test_nothing_else_leaks_out_of_the_package. Novy modul viewbase/bundle.py se po importu objevil ve jmennem prostoru balicku. Moje vlastni pojistka na verejne API tedy chytila neco, na co jsem pri jejim psani nemyslel - to me potesilo vic nez samotne B-04. Upravil jsem ji tak, ze podmoduly se vyjimaji (Python je tam vlozi sam, neni to rozhodnuti o API) a hlida se to, co API opravdu tvori: tridy a funkce. Overil jsem, ze unik hodnoty porad shodi dva testy.\n\nTed to podstatne: DOCHAZI MI PRACE, ktera nezavisi na D-42 nebo na transportu. Zbyva B-05 (ceka na prvni typ), B-11, B-17 a B-20 (vsechny na transport). Kdyby se D-42 melo jeste protahnout, radeji rekni, cim mam pokracovat - nebo jestli mam zacit transport a relace dodelat az potom. Transport se da napsat tak, ze o session id vi jen na jednom miste."
     },
     {
       "from": "konzultant",
       "to": "programmer",
       "at": "2026-08-19T14:16:51+02:00",
-      "text": "Nic z turn 21 neceka na verdikt a dve veci chvalim: uzavreny slovnik schopnosti (ctvrta ma byt rozhodnuti, ne dodatek) a to, ze kontrola bundlu je napsana DRIV nez frontend - presne jak zadalo D-09. Vyjimka podmodulu z kontroly verejneho API je v poradku: pritomnost podmodulu opravdu neni rozhodnuti o API, a dulezite je, ze unik HODNOTY porad shodi testy.\n\nK tvemu 'rekni, cim mam pokracovat': DULEZITE UPOZORNENI NAPRED. S vlastnikem projektu prave resime zmenu, ktera by se dotkla toho, co jsi delal v turnech 17-19: navrh je dat OBSAHU vlastni adresu (content:<handle>) a ACL, tedy rizeni prav obsahu presunout z apky k nam. Kdyby to padlo, zmizi list_content filtrovany apkou, created_by u apky, ContentRefused i cast D-38 - apce zbyde kontrakt, ve kterem nic nerozhoduje. NEZAKLADEJ na soucasnem modelu vlastnictvi nic dalsiho. Do priste to bude rozhodnute nebo zamitnute.\n\nCo delat mezitim, oboj\u00ed je na tom nezavisle:\n1) AUDIT jako skutecna komponenta - dnes mas minimalni AuditRecord. Patri k tomu: sanace vstupu na jednom miste (ridici znaky, zalomeni radku, strop delky), redakce podle klicu (code, token, secret, sid), sloupcovy format, audit MIMO prah zavaznosti a vlastni komponenta 'security'. Je to prevzato z viewBase2, kde se to osvedcilo, a nezavisi to ani na D-42, ani na transportu, ani na obsahu.\n2) NASTROJ SPRAVCE (D-11) - minimalni `python -m viewbase.admin adduser` (uzivatel, tajemstvi, QR). Stoji na identitach, ne na relacich, takze D-42 mu nevadi. Bez nej se do instance neda prihlasit vubec.\n\nJa mezitim pisu graph.v1 jako psany kontrakt a projdu tvuj odhad view_options u zbylych peti rendereru.\n\nD-42 jsem vlastnikovi polozil primo, spolu s tou zmenou modelu obsahu."
+      "text": "Nic z turn 21 neceka na verdikt a dve veci chvalim: uzavreny slovnik schopnosti (ctvrta ma byt rozhodnuti, ne dodatek) a to, ze kontrola bundlu je napsana DRIV nez frontend - presne jak zadalo D-09. Vyjimka podmodulu z kontroly verejneho API je v poradku: pritomnost podmodulu opravdu neni rozhodnuti o API, a dulezite je, ze unik HODNOTY porad shodi testy.\n\nK tvemu 'rekni, cim mam pokracovat': DULEZITE UPOZORNENI NAPRED. S vlastnikem projektu prave resime zmenu, ktera by se dotkla toho, co jsi delal v turnech 17-19: navrh je dat OBSAHU vlastni adresu (content:<handle>) a ACL, tedy rizeni prav obsahu presunout z apky k nam. Kdyby to padlo, zmizi list_content filtrovany apkou, created_by u apky, ContentRefused i cast D-38 - apce zbyde kontrakt, ve kterem nic nerozhoduje. NEZAKLADEJ na soucasnem modelu vlastnictvi nic dalsiho. Do priste to bude rozhodnute nebo zamitnute.\n\nCo delat mezitim, obojí je na tom nezavisle:\n1) AUDIT jako skutecna komponenta - dnes mas minimalni AuditRecord. Patri k tomu: sanace vstupu na jednom miste (ridici znaky, zalomeni radku, strop delky), redakce podle klicu (code, token, secret, sid), sloupcovy format, audit MIMO prah zavaznosti a vlastni komponenta 'security'. Je to prevzato z viewBase2, kde se to osvedcilo, a nezavisi to ani na D-42, ani na transportu, ani na obsahu.\n2) NASTROJ SPRAVCE (D-11) - minimalni `python -m viewbase.admin adduser` (uzivatel, tajemstvi, QR). Stoji na identitach, ne na relacich, takze D-42 mu nevadi. Bez nej se do instance neda prihlasit vubec.\n\nJa mezitim pisu graph.v1 jako psany kontrakt a projdu tvuj odhad view_options u zbylych peti rendereru.\n\nD-42 jsem vlastnikovi polozil primo, spolu s tou zmenou modelu obsahu."
     },
     {
       "from": "programmer",
@@ -244,6 +232,12 @@
       "to": "konzultant",
       "at": "2026-08-19T14:35:42+02:00",
       "text": "Vsechny tri body hotove. K rozdeleni auditu jsi napsal vetu, kterou si nechavam: 'seznam mel rikat, ze core je to, co nezavisi na nicem, ne ze core ma prave ctyri soubory'. Presne tak - a test architektury to potvrdil hned, protoze se parametrizuje pres ADRESAR, ne pres seznam jmen: novy modul si nasel sam a overil ho, aniz bych do testu sahl.\n\nPri tom rozdeleni jsem ale narazil na skutecnou diru a chci ji popsat, protoze je poucna (zapsal jsem ji jako F-21). Napsal jsem test 'ciste funkce auditu se daji pouzit bez runtime'. Prvni verze mazala moduly ze sys.modules - a rozbila tim jiny test. Spravne to jde jen v SAMOSTATNEM PROCESU, protoze v tom nasem uz je runtime davno naimportovany. A jakmile jsem to prepsal na subprocess, test SPADL: `from viewbase.core.audit import sanitize` naimportoval CELY runtime. Duvod je trivialni - import podmodulu spusti `__init__` balicku a ten mel `from .runtime.instance import Instance` natvrdo.\n\nPravidlo z par. 11 tedy platilo na urovni MODULU (muj statiky test importu byl v poradku), ale ne na urovni BALICKU. Dosud to nevadilo. Az transport pritahne server, vadilo by to hodne: kdo chce jen `Acl`, potreboval by mit nainstalovany FastAPI. Opravil jsem to lenym nacitanim (PEP 562 __getattr__): `import viewbase as vb; vb.Instance(...)` funguje uplne stejne, `dir(vb)` porad ukazuje ctyri jmena, ale core zustane sam. Overeno v samostatnem procesu.\n\nNastroj spravce je hotovy vcetne vsech tri zvyklosti, ktere jsi jmenoval. Jednu vec jsem udelal prisneji, nez bylo zadani: prava 0600 nastavuji uz PRI VZNIKU souboru (os.open s modem), ne chmod po zapisu. Mezi zapisem a chmod je okamzik, kdy je tajemstvi ctitelne komukoli - kratky, ale skutecny, a nestoji nic ho nemit.\n\nOveril jsem to trema sabotazemi: vypnuta kontrola jmena (uteceni pres '../../etc' shodilo 7 testu), prepisovani existujiciho uzivatele (3) a vypis tajemstvi na obrazovku (4).\n\nJedna vec, kterou nastroj JESTE NEDELA: neeviduje uzivatele nikde jinde nez v tom adresari, zadny users.json. Prihlasovani ho bude potrebovat, ale to visi na D-42, takze jsem to nechal byt - at to nemusim delat dvakrat."
+    },
+    {
+      "from": "konzultant",
+      "to": "programmer",
+      "at": "2026-08-19T14:41:49+02:00",
+      "text": "F-21 potvrzeno - ostry nalez a lenou fasadu nech. Nejcennejsi na tom je, ze jsi to overil v SAMOSTATNEM PROCESU; v nasem uz runtime naimportovany je, takze by tam import nedokazal nic. Tataz trida jako ten test, ktery neslo shodit.\n\nA ted velky balik. S vlastnikem projektu jsme dotahli model prav i tvar API a MENI TO CAST TOHO, CO MAS HOTOVE. Davam ti to najednou, at neprepisujes dvakrat. D-50 az D-56.\n\nCO SE MENI V KODU:\n1. see -> READ vsude (D-50). Jen prejmenovani.\n2. 'manage' z ACL PRYC (D-50). Prejmenovat, zrusit a menit prava smi zakladatel objektu nebo spravce - odvozene, ne deklarovane. Duvod: dedicnost ho rozbijela, nenastavene by spadlo na default_access.\n3. Prunik ma DVA cleny: okno prunik obsah (D-51). ACL registrace apky se tyka jen SPOUSTECE, do pruniku nepatri.\n4. OBSAH MA VLASTNI ADRESU A ACL (D-52) - to je ta zmena, pred kterou jsem te varoval. Prava obsahu se stehuji od apky k nam. Zanika list_content filtrovany apkou, created_by u apky i ContentRefused. Apce zbyva kontrakt, ve kterem nic nerozhoduje - open_content/snapshot/apply_event/close_content a hotovo.\n5. TVAR API (D-53, D-54):\n     inst   = vb.Instance(default_access=[...])\n     graf   = inst.app.register(GraphApp())      # nic z manifestu se neopakuje\n     provoz = inst.screen.open(title=\"Provoz\")\n     provoz.app.register(graf, title=\"Sit\")      # NABIDKA, ne otevreni\n     inst.serve()\n   Zadne window.open v deklaraci - okna vznikaji tim, ze si je divak otevre z nabidky. ACL se zadava na nabidce a okno ho zdedi. screen.window.* zustava pro beh.\n6. serve() nikdy nespousti apky (D-55).\n\nA jeden PRINCIP, podle ktereho se ted meri kazdy dalsi navrh (D-56): zjednodusuje se, kdekoli to jde; kazdy prirustek musi pojmenovat konkretni chybu, kterou zavira, jinak se nepridava. V jednom odpoledni podle nej padly tri jiz navrzene veci - vcetne dvou mych. Kdyz ti neco z toho, co ti zadavam, prijde jako slozitost bez pojmenovane chyby, RIKEJ TO; je to ted vyslovne soucast prace, ne drzost.\n\nPoradi bych volil: nejdriv prejmenovani a skrty (1-3, jsou mechanicke), pak obsah jako objekt (4), nakonec tvar API (5-6). D-42 porad ceka na vlastnika."
     }
   ],
   "questions": [
@@ -528,12 +522,12 @@
       "found_by": "konzultant",
       "severity": "vysoka",
       "where": "budouci runtime/ - vynucovaci misto",
-      "what": "Dedicnost odpovida na otazku 'jake ACL plati pro TENHLE objekt'. Brana plochy je SAMOSTATNA kontrola pred ni a dedicnost ji neslouc\u00ed. Konkretni past: okno ma see=[users], plocha ma write=[administrator]. Nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna pro zapis je [users] - a kdyby runtime kontroloval jen okno, uzivatel by psal do okna na plose, kde smi zasahovat jen spravce.",
+      "what": "Dedicnost odpovida na otazku 'jake ACL plati pro TENHLE objekt'. Brana plochy je SAMOSTATNA kontrola pred ni a dedicnost ji nesloucí. Konkretni past: okno ma see=[users], plocha ma write=[administrator]. Nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna pro zapis je [users] - a kdyby runtime kontroloval jen okno, uzivatel by psal do okna na plose, kde smi zasahovat jen spravce.",
       "impact": "Neni to chyba v core (tam je effective_acl spravne), je to past pri psani runtime. Hlasim ji DRIV, nez vznikne prvni vynucovaci misto. Chce to vlastni test s presne timhle rozlozenim prav.",
       "refs": [
         "D-06"
       ],
-      "verdict": "POTVRZENO a vyresene. Byl to dobry postreh a rikam narovinu, ze bez nej bych to napsal spatne - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehl\u00e9dne. Guard._check_object kontroluje branu plochy zvlast a jako prvni; test ma v sobe i overeni predpokladu pasti (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu. Sabotaz (vypnuta brana plochy) ho shodila."
+      "verdict": "POTVRZENO a vyresene. Byl to dobry postreh a rikam narovinu, ze bez nej bych to napsal spatne - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehlédne. Guard._check_object kontroluje branu plochy zvlast a jako prvni; test ma v sobe i overeni predpokladu pasti (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu. Sabotaz (vypnuta brana plochy) ho shodila."
     },
     {
       "id": "F-10",
@@ -552,7 +546,7 @@
       "found_by": "programmer",
       "severity": "vysoka",
       "where": "docs/architektura-navrh.md par. 5, radek Needs.INSTANCE v tabulce",
-      "what": "Tabulka ma u INSTANCE pomlcky ve vsech trech sloupcich (brana plochy, okno videt, okno zasahovat). Jak je to napsane, INSTANCE nekontroluje nic - je to Needs.NONE pod jinym jmenem, tedy hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ani jeden z nas ne\u0159ekl v Q-06, proti cemu se INSTANCE vyhodnocuje.",
+      "what": "Tabulka ma u INSTANCE pomlcky ve vsech trech sloupcich (brana plochy, okno videt, okno zasahovat). Jak je to napsane, INSTANCE nekontroluje nic - je to Needs.NONE pod jinym jmenem, tedy hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ani jeden z nas neřekl v Q-06, proti cemu se INSTANCE vyhodnocuje.",
       "impact": "Kdyby to nekdo implementoval doslova podle tabulky, kazda udalost s needs=INSTANCE by sla zavolat komukoli - vcetne anonyma pres REST. Implementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno -> prochazi jen administrator pres vyjimku v allowed). Potrebuje potvrdit a hlavne doplnit do tabulky, at pomlcka nesvadi k dire.",
       "refs": [
         "D-06",
@@ -613,7 +607,7 @@
       "found_by": "programmer",
       "severity": "stredni",
       "where": "D-36 vs. pravidlo o vychozich stavech retezu v runtime/registry.py",
-      "what": "D-36 ne\u0159\u00edka, jaka je VYCHOZI viditelnost registrace apky, kdyz na ni nikdo ACL nenastavi. Mel jsem uz pravidlo, ze retez plochy konci default_access a retez instance konci zavreno; adresa 'app:' spadla do druhe vetve a cerstve nasazena instance neukazala ve spoustci nic. Veta 'bez ACL na registraci vidi kazdy prihlaseny vsechny apky' sla cist jako popis stavu i jako popis problemu.",
+      "what": "D-36 neříka, jaka je VYCHOZI viditelnost registrace apky, kdyz na ni nikdo ACL nenastavi. Mel jsem uz pravidlo, ze retez plochy konci default_access a retez instance konci zavreno; adresa 'app:' spadla do druhe vetve a cerstve nasazena instance neukazala ve spoustci nic. Veta 'bez ACL na registraci vidi kazdy prihlaseny vsechny apky' sla cist jako popis stavu i jako popis problemu.",
       "impact": "Rozhodl jsem 'apky se chovaji jako plochy' (konci na default_access), protoze spoustec je k tomu, aby se videl, a utajit apku jde ACL. Opacne rozhodnuti (zavreno) je bezpecnejsi, ale znamena, ze spravce zacina tim, ze odemyka po jedne. Je to jeden radek v registry.resolve a dva testy. Potvrd, nebo otoc.",
       "refs": [
         "D-36",
@@ -681,7 +675,7 @@
       "refs": [
         "D-13"
       ],
-      "verdict": null
+      "verdict": "POTVRZENO a je to ostry nalez. Staticky test importu prochazel, ale balicek tahl runtime - pravidlo tedy platilo na urovni MODULU a ne na urovni BALICKU, a to je rozdil, ktery by se ukazal az s FastAPI v zavislostech. Lenou fasadu nech. Nejcennejsi je, ze jsi to overil v SAMOSTATNEM PROCESU: v nasem uz runtime naimportovany je, takze by tam import nedokazal nic. To je tataz trida, jako kdyz jsi nasel test, ktery nesel shodit."
     }
   ],
   "decisions": [
@@ -847,7 +841,7 @@
       "id": "D-15",
       "topic": "vynucovani",
       "decision": "Brana plochy a ACL okna se kontroluji ZVLAST. Runtime nesmi nahradit dve kontroly jednim dotazem na efektivni ACL okna.",
-      "why": "Dedicnost slouc\u00ed jen prava jednoho objektu, ne dve urovne. Viz F-09 s konkretnim rozlozenim prav, na kterem to selze.",
+      "why": "Dedicnost sloucí jen prava jednoho objektu, ne dve urovne. Viz F-09 s konkretnim rozlozenim prav, na kterem to selze.",
       "docs": "architektura-navrh.md par. 5",
       "refs": [
         "F-09",
@@ -1076,7 +1070,7 @@
     {
       "id": "D-36",
       "topic": "spoustec",
-      "decision": "Nabidka Apps je vec WORKBENCHE, ne apky - stav\u00ed ji z registru apek a z list_content(subject). Apka do globalniho menu nevklada nic. Registrace apky je OBJEKT s adresou app:<app_id> a vlastnim ACL, takze se filtruje nasim modelem, kdo apku vubec uvidi.",
+      "decision": "Nabidka Apps je vec WORKBENCHE, ne apky - staví ji z registru apek a z list_content(subject). Apka do globalniho menu nevklada nic. Registrace apky je OBJEKT s adresou app:<app_id> a vlastnim ACL, takze se filtruje nasim modelem, kdo apku vubec uvidi.",
       "why": "Menu okna deklaruje apka, ale spoustec existuje driv, nez je jake okno. Kdyby do nej apka smela vkladat, ma nastroj, jak si pridat cokoli komukoli do listy. A bez ACL na registraci vidi kazdy prihlaseny vsechny apky.",
       "docs": "typy-oken.md",
       "refs": [
@@ -1221,6 +1215,81 @@
         "D-41"
       ],
       "implemented_in": "runtime/window.py CAPABILITIES + capabilities_for(); tests/test_subject.py"
+    },
+    {
+      "id": "D-50",
+      "topic": "slovesa",
+      "decision": "ACL ma prave dve slovesa: READ a WRITE (drive see/write). 'manage' v ACL NENI - prejmenovat, zrusit a menit prava smi ZAKLADATEL objektu nebo spravce, odvozene.",
+      "why": "Rozhodl vlastnik projektu. read/write je univerzalnejsi dvojice. manage v ACL rozbijela dedicnost: nenastavene by spadlo na default_access, takze by objekt smel zrusit kdokoli prihlaseny - a musela by se pridat vyjimka 'manage se dedi jinak'.",
+      "docs": "architektura-navrh.md dodatek, glosar.md",
+      "refs": [
+        "D-49"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-51",
+      "topic": "prunik",
+      "decision": "Efektivni pravo divaka v okne = OKNO prunik OBSAH. ACL registrace apky do pruniku NEPATRI - tyka se spoustece (kdo apku uvidi v nabidce).",
+      "why": "Kdyz je okno otevrene na plose, kterou divak vidi, nedava smysl mu obsah zavrit proto, ze 'na apku nema'. A druha uroven se plati jen kdyz se pouzije: ACL obsahu nenastavene = zadne omezeni navic.",
+      "docs": "architektura-navrh.md dodatek",
+      "refs": [
+        "D-36"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-52",
+      "topic": "obsah jako objekt",
+      "decision": "OBSAH MA VLASTNI ADRESU content:<handle> A VLASTNI ACL. Prava obsahu se stehují od apky k nam. Zanika: list_content filtrovany apkou, created_by u apky, ContentRefused, cast D-38 o odmitani. Apce zbyva kontrakt, ve kterem NIC NEROZHODUJE.",
+      "why": "Rozhodl vlastnik projektu. Je to jedina vec, ktera proti viewBase2 pribyva, a je tam kvuli konkretni chybe: instance-wide obsah (log) se zverejnil tim, ze ho nekdo polozil na verejnou plochu. Bez druhe urovne se ta trida chyb zavrit neda. Vedlejsi zisk: autor apky nema CO pokazit, protoze o pravech nic neimplementuje.",
+      "docs": "architektura-navrh.md dodatek",
+      "refs": [
+        "D-37",
+        "D-41",
+        "D-49"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-53",
+      "topic": "tvar API",
+      "decision": "Dve pravidla: (1) CO JE V MANIFESTU, SE V KODU NEPISE ZNOVU - inst.app.register(GraphApp()) si vezme app_id, kind i scope odtamtud; (2) OBJEKTY MISTO RETEZCU - window bere app=graf, content=g, ne app_id a handle. ACL se zadava rovnou pri vzniku (read=[...], write=[...]).",
+      "why": "Opakovani manifestu v kodu se da rozejit; retezce patri do konfigurace a na drat, ne do volani. Meritko jednoduchosti: nejkratsi funkcni skript ma sest radku bez id, bez ACL a bez rukojeti.",
+      "docs": "architektura-navrh.md dodatek",
+      "refs": [
+        "D-19"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-54",
+      "topic": "nabidka misto otevirani",
+      "decision": "ZADNE window.open v deklaraci. Vyvojar volá screen.app.register(graf, title=..., read=..., write=...) - tim apku NABIDNE na te plose. Okna vznikaji tim, ze si je divak otevre z nabidky. Zavreni okna nabidku nerusi. ACL se deklaruje na nabidce a okno ho zdedi. screen.window.* zustava pro beh (get/all/close).",
+      "why": "Rozhodl vlastnik projektu. Pri startu tak neexistuje zadne okno - workbench je prostredi, ne scenar. Prihznak open_on_start by udelal z volani vetu 'otevri, ale neotevirej'; druhe sloveso (offer) by existovalo kvuli pripadu, ktery ma stejne resit divak.",
+      "docs": "architektura-navrh.md dodatek",
+      "refs": [
+        "D-53"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-55",
+      "topic": "serve",
+      "decision": "inst.serve() spousti WORKBENCH (port, WebSocket, vysilaci smycka) - NIKDY apku. Apka v procesu zije od sveho vzniku, apka v kontejneru bezi nezavisle.",
+      "why": "Kdyby workbench apky spoustel, prestaly by byt samostatne - a to je zrovna vlastnost, kvuli ktere jsou vytazene ven.",
+      "docs": "architektura-navrh.md dodatek",
+      "refs": [],
+      "implemented_in": null
+    },
+    {
+      "id": "D-56",
+      "topic": "princip",
+      "decision": "SESTY PRINCIP: zjednodusuje se, kdekoli to jde. Kazdy prirustek k modelu musi pojmenovat KONKRETNI CHYBU, kterou zavira; co ji pojmenovat neumi, se nepridava. Pri pochybach se skrta. Hranice, kterou neprekrocit: ctvrte sloveso, druhy druh dedicnosti, deny pravidla.",
+      "why": "Rozhodl vlastnik projektu. Model prav, ktery si clovek nedokaze predstavit v hlave, se nastavuje zkusmo - a takhle nastavena prava jsou vzdycky sirsi, nez kdo chtel. Nesrozumitelnost je u autorizace bezpecnostni vada, ne esteticka. V jednom odpoledni podle toho padly tri jiz navrzene veci: manage v ACL, ACL apky v pruniku a window.open pri startu.",
+      "docs": "architektura-navrh.md par. 1",
+      "refs": [],
+      "implemented_in": null
     }
   ],
   "backlog": [
@@ -1456,10 +1525,42 @@
   ],
   "history": [
     {
+      "by": "programmer",
+      "turn": 25,
+      "at": "2026-08-19T14:35:42+02:00",
+      "summary": "Vsechny tri tve body hotove: audit rozdelen na core/runtime, odmitnuty pristup k obsahu je bezpecnostni stopa, nastroj spravce hotovy vcetne prevzatych zvyklosti. 491 testu zelenych. Pri rozdeleni auditu jsem narazil na skutecnou diru v rozvrzeni (F-21) a opravil ji.",
+      "done": [
+        "core/audit.py - sanace, redakce, tvar zaznamu, build_record a format_record (ciste funkce); runtime/audit.py uz jen AuditLog se stavem a prahem",
+        "Odmitnuty pristup k obsahu je ted BEZPECNOSTNI zaznam a prezije log_level='error'; nedostupny obsah zustava provozni stav podlehajici prahu",
+        "F-21 (novy, muj): oprava lene fasady balicku - viz nize",
+        "B-22: viewbase/admin.py + `python -m viewbase.admin adduser <jmeno>`; 26 testu",
+        "B-22: artefakty v ~/.viewbase/user-<jmeno>/, adresar 0700, soubory 0600 uz pri VZNIKU (os.open s modem, ne chmod po zapisu)",
+        "B-22: do vypisu jde jen UKAZATEL - tajemstvi ani otpauth URI se na obrazovku nedostanou a nejsou ani v repr vysledku",
+        "B-22: stitek viewBase:user:<jmeno>; existujici uzivatel se NEPREPISUJE",
+        "pyotp a qrcode pridany do pyproject.toml jako runtime zavislosti (nejsou volitelny extra - bez nich nejde zalozit identita)"
+      ],
+      "tested": [
+        "491 testu zelenych (26 na nastroj spravce, 47 na audit).",
+        "SABOTAZ nastroje spravce trikrat: (a) vypnuta kontrola jmena -> 7 padlych testu vcetne uteceni z adresare pres '../../etc', (b) prepisovani existujiciho uzivatele -> 3 padle, (c) vypis tajemstvi na obrazovku -> 4 padle.",
+        "SABOTAZ auditu: podrizeni prahu a vynechani sanace u jednoho sloupce - obojí overeno uz minule, po rozdeleni na core/runtime porad drzi.",
+        "Test architektury si novy modul core/audit.py nasel SAM a overil, ze nezavisi na nicem - parametrizuje se pres adresar, ne pres seznam jmen.",
+        "Jeden muj novy test mel globalni vedlejsi ucinek (mazal moduly ze sys.modules a rozbil tim jiny test). Prepsal jsem ho na samostatny proces - a teprve ten odhalil F-21."
+      ],
+      "unclear": [
+        "F-21 je muj nalez a rovnou jsem ho opravil, protoze bez opravy by test izolace core nesel napsat pravdive. Kdyby ti lena fasada vadila, je to jeden soubor zpatky - ale pak by ten test musel zmizet a s nim i tvrzeni, ze core stoji sam.",
+        "Nastroj spravce zatim NEEVIDUJE uzivatele nikde jinde nez v tom adresari - zadny users.json neni. Prihlasovani ho bude potrebovat (overit kod proti tajemstvi konkretniho cloveka), ale to zavisi na D-42, tak jsem to nechal."
+      ],
+      "needs_verification": [
+        "Nove runtime zavislosti: pyotp a qrcode. Jsou v pyproject.toml. viewBase2 na to mel test_requirements.py (import bez zavislosti a zavislost bez importu jsou chyby) - stoji za prevzeti, az bude zavislosti vic.",
+        "Prava 0600 nastavuji uz pri vzniku souboru pres os.open, ne chmod po zapisu. Rozdil je maly, ale skutecny: mezi zapisem a chmod je okamzik, kdy je tajemstvi ctitelne komukoli."
+      ],
+      "blocked": "Ne."
+    },
+    {
       "by": "konzultant",
       "turn": 24,
       "at": "2026-08-19T14:27:15+02:00",
-      "summary": "Odpovedi na tri otazky k auditu: rozdelit na ciste funkce (core) a stav (runtime), odmitnuty pristup k obsahu je bezpecnostni stopa, nastroj spravce zacit cel\u00fd s prevzetim vb2 zvyklosti.",
+      "summary": "Odpovedi na tri otazky k auditu: rozdelit na ciste funkce (core) a stav (runtime), odmitnuty pristup k obsahu je bezpecnostni stopa, nastroj spravce zacit celý s prevzetim vb2 zvyklosti.",
       "done": [
         "prosel audit; pochvala za redakci do hloubky a za to, ze 'security' si bezny zaznam nesmi vzit",
         "rozhodnuto umisteni: core/audit.py pro ciste funkce, AuditLog zustava v runtime; par. 11 se rozsiri",
@@ -1485,7 +1586,7 @@
       "done": [
         "runtime/audit.py - sanace, redakce, sloupcovy format, prah a komponenta 'security'",
         "Sanace na JEDNOM miste: ridici znaky se prevedou na \\xNN, zalomeni radku na \\n, strop delky s poctem chybejicich znaku",
-        "Redakce podle klicu DO HLOUBKY (dict i seznamy), hled\u00e1 se podretezec - takze `access_token` i `user_secret` projdou; hodnota se nahradi delkou",
+        "Redakce podle klicu DO HLOUBKY (dict i seznamy), hledá se podretezec - takze `access_token` i `user_secret` projdou; hodnota se nahradi delkou",
         "Audit prahu NEPODLEHA a komponentu 'security' si bezny zaznam nesmi vzit - jinak by sel prah obejit z druhe strany",
         "Session id jde do stopy jen jako prefix (8 znaku)",
         "AuditLog zapojen do Instance; zmena prav a odmitnuty token jsou ted bezpecnostni stopa, tedy prezijou i log_level='error'",
@@ -1594,14 +1695,14 @@
         "397 testu zelenych.",
         "SABOTAZ: interni volajici zase jako anonym -> spadly tri testy vcetne toho, ze apka odmitajici anonymy obslouzi knihovni kod.",
         "SABOTAZ: 'own' udelene vsem, kdo smi psat -> spadly dva testy vcetne toho, ze cizi clovek se nedozvi, ze obsah vlastni.",
-        "NALEZ NA SOBE SAMEM: prvni pokus o odstraneni vychozi hodnoty u snapshot_for NESEDL - v docstringu zustala diakritika z drivejsi upravy, takze se vzor netrefil a `capabilities=None` tam zustalo. Testy pritom bezely ZELENE (397), protoze stara volani se dvema argumenty dal prochazela. Vsiml jsem si az pri kontrole, proc stare testy neselhaly. Overil jsem to pak primo vol\u00e1n\u00edm z Pythonu, ne jen testem."
+        "NALEZ NA SOBE SAMEM: prvni pokus o odstraneni vychozi hodnoty u snapshot_for NESEDL - v docstringu zustala diakritika z drivejsi upravy, takze se vzor netrefil a `capabilities=None` tam zustalo. Testy pritom bezely ZELENE (397), protoze stara volani se dvema argumenty dal prochazela. Vsiml jsem si az pri kontrole, proc stare testy neselhaly. Overil jsem to pak primo voláním z Pythonu, ne jen testem."
       ],
       "unclear": [
         "F-18 jsem vyresil jinak, nez jsi navrhoval, a je to vecna neshoda - viz verdikt. Kdyz na skupinach v subjectu trvas, chce to nejdriv zmenit apka-kontrakt.md par. 2, ktery je dnes v primem rozporu (rika 'subject nikdy nenese skupiny').",
         "Jmeno schopnosti 'own': review vyhrada 4 uvadi priklad ['read','write','admin']. Zvolil jsem 'own', protoze rika, co ten clovek smi, ne kdo je - apka nema duvod vedet o roli spravce. Kdyz chces drzet 'admin', je to prejmenovani."
       ],
       "needs_verification": [
-        "K tvemu 'az opravis F-18, grafova apka zacne pou\u0161t\u011bt spravce k cizim obsahum': ZACNE, ale jinou cestou. Misto groups j\u00ed prijde v subjectu capabilities s 'own'. Tvuj _may_touch ma tedy misto kontroly group:administrator kontrolovat 'own' in subject['capabilities'] - a bude to fungovat na OBOU kanalech stejne, protoze na klientskem kanale si to apka rozhodne z introspekce a na prezentacnim to dostane hotove.",
+        "K tvemu 'az opravis F-18, grafova apka zacne pouštět spravce k cizim obsahum': ZACNE, ale jinou cestou. Misto groups jí prijde v subjectu capabilities s 'own'. Tvuj _may_touch ma tedy misto kontroly group:administrator kontrolovat 'own' in subject['capabilities'] - a bude to fungovat na OBOU kanalech stejne, protoze na klientskem kanale si to apka rozhodne z introspekce a na prezentacnim to dostane hotove.",
         "Schopnosti dostava apka v snapshot a apply_event. V open_content je zamerne NEDAVAM: vazba okna na obsah se deje jednou a neni to per divak - to jsi napsal sam v F-17 a je to spravne."
       ],
       "blocked": "Ne."
@@ -1626,7 +1727,7 @@
         "F-17 az F-19 jsou navrhy oprav, ne hotova rozhodnuti - vyjadri se, jestli s nimi souhlasis, a pak je zapisu jako D."
       ],
       "needs_verification": [
-        "Az opravis F-18, grafova apka zacne pou\u0161t\u011bt spravce k cizim obsahum - mam na to test, ktery ted prochazi jen pres klientsky kanal.",
+        "Az opravis F-18, grafova apka zacne pouštět spravce k cizim obsahum - mam na to test, ktery ted prochazi jen pres klientsky kanal.",
         "D-42 porad ceka na vlastnika."
       ],
       "blocked": "Ne."
@@ -1649,7 +1750,7 @@
       "tested": [
         "376 testu zelenych. Porad bez serveru.",
         "SABOTAZ: zasedle polozky se misto zasednuti skryji -> spadly dva testy. Skryta polozka je horsi nez zasedla: lide se pak ptaji, proc to jde kolegovi a jim ne.",
-        "SABOTAZ: destruktivni polozka se nept\u00e1 na vlastnika obsahu -> spadl test s dvema divaky nad jednim obsahem.",
+        "SABOTAZ: destruktivni polozka se neptá na vlastnika obsahu -> spadl test s dvema divaky nad jednim obsahem.",
         "Obe sabotaze jsem poustel nad CELYM souborem, ne pres -k. To ponauceni z minula si drzim."
       ],
       "unclear": [
@@ -1744,7 +1845,7 @@
       "by": "programmer",
       "turn": 13,
       "at": "2026-08-19T13:28:18+02:00",
-      "summary": "D-36, D-37, D-38, D-39, D-40, D-41 a B-16 hotove. 307 testu zelenych. D-35 a D-42 jsem ZAMERNE NEDELAL - prvni je renderer-adjacent a ty jsi psal, a\u0165 na otevrene otazce o rendererech nic nestavim, druhy je navrh, ne rozhodnuti. Jedno rozhodnuti jsem musel udelat sam a chci na nej razitko: vychozi viditelnost registrace apky.",
+      "summary": "D-36, D-37, D-38, D-39, D-40, D-41 a B-16 hotove. 307 testu zelenych. D-35 a D-42 jsem ZAMERNE NEDELAL - prvni je renderer-adjacent a ty jsi psal, ať na otevrene otazce o rendererech nic nestavim, druhy je navrh, ne rozhodnuti. Jedno rozhodnuti jsem musel udelat sam a chci na nej razitko: vychozi viditelnost registrace apky.",
       "done": [
         "D-36: Address.app(app_id) - registrace apky je objekt s adresou 'app:<app_id>' a vlastnim ACL; instance.app.visible_to(caller) je spoustec a filtruje nasim modelem",
         "D-37: AppBackend.list_content(subject); instance.app.get(x).list_content(caller). Spadla apka da prazdny seznam, ne vyjimku - spoustec se kvuli jedne mrtve apce nesmi rozbit.",
@@ -1763,11 +1864,11 @@
         "B-16 ma i test, ze udalost apky podleha TEMUZ invariantu jako vestavene: anonym na skryte plose na ni nedosahne."
       ],
       "unclear": [
-        "VYCHOZI VIDITELNOST APKY - viz F-16. Musel jsem to rozhodnout, abych mel zelene testy, a rozhodl jsem 'apky se chovaji jako plochy' (konc\u00ed na default_access). Kdyby to melo byt zavrene, je to jeden radek a par testu.",
+        "VYCHOZI VIDITELNOST APKY - viz F-16. Musel jsem to rozhodnout, abych mel zelene testy, a rozhodl jsem 'apky se chovaji jako plochy' (koncí na default_access). Kdyby to melo byt zavrene, je to jeden radek a par testu.",
         "Udalosti apky maji zatim zastupny handler (_app_handler), ktery nic nedela - smerovani do apky prijde s transportem. Registr je ale spravny uz ted, coz je to podstatne."
       ],
       "needs_verification": [
-        "D-35 (menu okna) jsem VYNECHAL cely a chci to potvrdit: serverove polozky deklaruje apka, coz je registrace-shaped a delat bych to umel, ale prezentacni blok v open_content a lokalni polozky pres ctx.menu jsou renderer-shaped - a tys psal, a\u0165 na otevrene otazce o rendererech nic nestavim. Az bude rozhodnuta, udelam to v jednom kuse.",
+        "D-35 (menu okna) jsem VYNECHAL cely a chci to potvrdit: serverove polozky deklaruje apka, coz je registrace-shaped a delat bych to umel, ale prezentacni blok v open_content a lokalni polozky pres ctx.menu jsou renderer-shaped - a tys psal, ať na otevrene otazce o rendererech nic nestavim. Az bude rozhodnuta, udelam to v jednom kuse.",
         "D-42 (session id do httpOnly cookie) je NAVRH a nechal jsem ho lezet. Az ho vlastnik potvrdi, patri to k relacim, ktere delam dal - takze idealne rozhodnout driv, nez zacnu.",
         "D-43 (apka dolozi izolaci obsahu testem) je uloha pro tebe jako autora grafove apky, ne pro workbench. Z nasi strany to nejde overit ani v principu: kdyz apka odpovi na rukojet A daty od B, z naseho pohledu odpovedela na to, na co byla dotazana."
       ],
@@ -1777,7 +1878,7 @@
       "by": "konzultant",
       "turn": 12,
       "at": "2026-08-19T15:30:00+02:00",
-      "summary": "Razitka na F-14 (tve reseni je lepsi nez muj navrh) a F-15. Zapsano D-35 az D-43 z rozhovoru s vlastnikem: menu okna, spoustec, list_content a jmena obsahu, subjekt u pripojeni, schopnosti required/optional, vlastnik obsahu, session id do cookie (navrh), izolace obsahu dolo\u017eena testem.",
+      "summary": "Razitka na F-14 (tve reseni je lepsi nez muj navrh) a F-15. Zapsano D-35 az D-43 z rozhovoru s vlastnikem: menu okna, spoustec, list_content a jmena obsahu, subjekt u pripojeni, schopnosti required/optional, vlastnik obsahu, session id do cookie (navrh), izolace obsahu doložena testem.",
       "done": [
         "verdikt F-14 (prijimam tve reseni, na svem navrhu netrvam) a F-15 (tvuj vyklad scope instance je spravny)",
         "zapsano D-35 az D-43"
@@ -1803,7 +1904,7 @@
         "D-26: runtime/content.py - obsah ma rukojet, okno je pohled. Zavreni okna odpojuje pohled, obsah zije dal.",
         "D-27: scope window|session|user|instance|app|explicit; neznamy scope selze uz pri registraci",
         "D-28: AppBackend jako Protocol - open_content/snapshot/apply_event/close_content, ZADNE screen ani window",
-        "D-29: rukojet razi instance HMACem z tajemstvi; Instance(secret=...) ji nech\u00e1 prezit i restart instance",
+        "D-29: rukojet razi instance HMACem z tajemstvi; Instance(secret=...) ji nechá prezit i restart instance",
         "D-30: jeden obsah ve vice oknech s ruznymi ACL; instance.content.views(handle) rika, kam deltu rozeslat",
         "D-31 castecne: snapshot nese cursor a projde az ke klientovi; sesivani delt od kurzoru prijde s transportem",
         "D-32: tri stavy (neznama/nedostupna/pomala), volani apky v thread poolu s limitem, stav drzi instance",
@@ -1977,7 +2078,7 @@
       ],
       "tested": [
         "153 testu zelenych (core 102 + runtime 51). Cely runtime bezi bez serveru.",
-        "SABOTAZ vynucovaciho mista: vypnul jsem branu plochy v Guard._check_object (presne chyba 3.2 z viewBase2). Padlo 5 testu vcetne test_anonymous_on_a_hidden_screen_reaches_no_handler_at_all a testu na F-09. Po vraceni 153 passed. Invariant nad registrem tim ma doloz\u00e9no, ze diru opravdu chyta.",
+        "SABOTAZ vynucovaciho mista: vypnul jsem branu plochy v Guard._check_object (presne chyba 3.2 z viewBase2). Padlo 5 testu vcetne test_anonymous_on_a_hidden_screen_reaches_no_handler_at_all a testu na F-09. Po vraceni 153 passed. Invariant nad registrem tim ma dolozéno, ze diru opravdu chyta.",
         "Pridal jsem k invariantu jeste kontrolu sebe sama (test_the_invariant_test_would_notice_a_hole): na verejne plose musi nektera udalost PROJIT. Bez toho by invariant prochazel i nad vynucovanim, ktere odmita vsechno.",
         "Jeden muj test byl spatne a opravil jsem TEST, ne kod: 'volajici bez relace nema krok navic' jsem napsal s anonymem, ktery ale skonci uz na brane plochy. Prepsal jsem ho na volajiciho, ktery ACL PROJDE (REST s principaly) a relaci nema - ted konci na NO_GRANT, jak ma."
       ],
