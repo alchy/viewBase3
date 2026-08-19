@@ -176,20 +176,28 @@ class Guard:
                 return Decision(Verdict.INSTANCE_CLOSED)
             return Decision(Verdict.OK)
 
-        decision = self._check_object(caller, registration, target)
+        decision = self._check_object(caller, registration.needs, target)
         if not decision:
             return decision
         return self._check_step_up(caller, registration, target)
 
+    def may(self, caller: Caller, needs: Needs, target: Address) -> Decision:
+        """Smel by tenhle volajici na tenhle objekt, kdyby o to slo?
+
+        Pouziva se tam, kde neni udalost - typicky pri skladani menu. Vede to
+        TOUZ funkci jako `check`, aby nevznikla druha vetev vynucovani: presne
+        na tom ve viewBase2 stala chyba 3.1.
+        """
+        return self._check_object(caller, needs, target)
+
     # -- dve urovne, kazda zvlast ----------------------------------------
 
     def _check_object(
-        self, caller: Caller, registration: Registration, target: Address | None
+        self, caller: Caller, needs: Needs, target: Address | None
     ) -> Decision:
         if target is None:
             return Decision(Verdict.WRONG_TARGET)
 
-        needs = registration.needs
         if needs is Needs.SCREEN:
             if target.kind != "screen":
                 return Decision(Verdict.WRONG_TARGET)

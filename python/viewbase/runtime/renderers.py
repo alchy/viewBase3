@@ -22,10 +22,10 @@ grafem, a az nekdo napise `table`, ktery `graph.v1` taky prijme, je z toho
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class Renderer:
     """Jeden renderer v katalogu a jeho datove API."""
 
@@ -37,26 +37,44 @@ class Renderer:
     #: Co pouzije, kdyz to dostane, a jinak se degraduje (webgl -> 2D ustup).
     optional_capabilities: tuple[str, ...] = ()
     #: Volby, ktere meni JEN MUJ POHLED a na server nechodi (skupina "View").
-    view_options: tuple[str, ...] = ()
+    #: Mapa jmeno -> {"type": toggle|choice, "options": [...], "value": vychozi}.
+    view_options: dict = field(default_factory=dict)
 
 
 #: Sada, se kterou se viewBase dodava (typy-oken.md par. 4).
+def _toggle(value=True):
+    return {"type": "toggle", "value": value}
+
+
+def _choice(options, value):
+    return {"type": "choice", "options": list(options), "value": value}
+
+
 BUILTIN = (
-    Renderer("panel", contract="panel.v1", view_options=("density",)),
-    Renderer("doc", contract="doc.v1", view_options=("width",)),
-    Renderer("console", contract="console.v1", view_options=("wrap", "font_size")),
+    Renderer("panel", contract="panel.v1",
+             view_options={"density": _choice(["compact", "comfortable"], "comfortable")}),
+    Renderer("doc", contract="doc.v1",
+             view_options={"width": _choice(["narrow", "wide"], "narrow")}),
+    Renderer("console", contract="console.v1",
+             view_options={"wrap": _toggle(True), "font_size": _choice(["s", "m", "l"], "m")}),
     Renderer(
         "shell",
         contract="shell.v1",
         capabilities=("keyboard-capture",),
-        view_options=("font_size",),
+        view_options={"font_size": _choice(["s", "m", "l"], "m")},
     ),
-    Renderer("log", contract="log.v1", view_options=("wrap", "columns")),
+    Renderer("log", contract="log.v1",
+             view_options={"wrap": _toggle(False), "columns": _toggle(True)}),
     Renderer(
         "graph",
         contract="graph.v1",
         optional_capabilities=("webgl",),
-        view_options=("physics", "dimensions", "splines", "highlight"),
+        view_options={
+            "physics": _toggle(True),
+            "dimensions": _choice(["2D", "3D"], "3D"),
+            "splines": _toggle(False),
+            "highlight": _toggle(True),
+        },
     ),
 )
 
@@ -78,7 +96,7 @@ class RendererCatalogue:
         contract: str,
         capabilities: tuple[str, ...] = (),
         optional_capabilities: tuple[str, ...] = (),
-        view_options: tuple[str, ...] = (),
+        view_options: dict | None = None,
     ) -> Renderer:
         """Pridej renderer do katalogu.
 
@@ -88,7 +106,7 @@ class RendererCatalogue:
         if kind in self._renderers:
             raise ValueError(f"renderer uz v katalogu je: {kind!r}")
         renderer = Renderer(
-            kind, contract, capabilities, optional_capabilities, view_options
+            kind, contract, capabilities, optional_capabilities, dict(view_options or {})
         )
         self._renderers[kind] = renderer
         return renderer

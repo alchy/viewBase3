@@ -102,7 +102,25 @@ class WindowCollection:
             handle, _ = instance.content.attach(
                 handle, app, address, {"kind": registration.kind}, by
             )
+            self._check_view_defaults(app, address, handle, registration.kind)
         return WindowApp(id=app, scope=scope, handle=handle)
+
+    def _check_view_defaults(self, app: str, address, handle, kind: str | None) -> None:
+        """Apka smi nastavit vychozi hodnoty voleb rendereru, ne vymyslet nove.
+
+        Tise zahodit neznamou volbu by znamenalo, ze autor apky hleda, proc se
+        jeho nastaveni neprojevilo. Zapisuje se jednou, pri otevirani.
+        """
+        instance = self._screen._instance
+        if handle is None or kind is None or kind not in instance.renderer:
+            return
+        known = instance.renderer.get(kind).view_options
+        for name in instance.content.view_defaults(handle):
+            if name not in known:
+                instance._record(
+                    "app", "unknown_view_option", address,
+                    detail=f"{app}: renderer {kind!r} nema volbu {name!r}",
+                )
 
     def _check_app(self, app: str, kind: str) -> None:
         registry = self._screen._instance.app

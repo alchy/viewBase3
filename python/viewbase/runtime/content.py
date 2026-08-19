@@ -91,6 +91,10 @@ class Content:
     #: jeden obsah muze byt ve dvou oknech s ruznymi ACL, takze pravo psat
     #: v jednom okne nesmi znamenat pravo znicit obsah videny v druhem.
     created_by: str | None = None
+    #: Vychozi hodnoty voleb rendereru, ktere apka poslala v `open_content`.
+    #: Smi je NASTAVIT, ne odebirat: co pro dana data nedava smysl, schova si
+    #: renderer sam (D-46).
+    view_defaults: dict = field(default_factory=dict)
 
 
 def subject_of(caller: Caller, capabilities: list[str] | None = None) -> dict:
@@ -129,6 +133,7 @@ class ContentRegistry:
         self._audit = audit or (lambda *a, **k: None)
         self._contents: dict[str, Content] = {}
         self._backends: dict[str, AppBackend] = {}
+        self._pending_view: dict = {}
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="viewbase-app")
 
     # -- razeni rukojeti --------------------------------------------------
@@ -172,6 +177,10 @@ class ContentRegistry:
         content = self._contents.get(handle)
         return () if content is None else tuple(sorted(content.views, key=str))
 
+    def view_defaults(self, handle: str | None) -> dict:
+        content = self._contents.get(handle) if handle else None
+        return {} if content is None else dict(content.view_defaults)
+
     def created_by(self, handle: str) -> str | None:
         content = self._contents.get(handle)
         return None if content is None else content.created_by
@@ -206,6 +215,7 @@ class ContentRegistry:
                 content.views.add(address)
             return handle, content.state
 
+        self._pending_view = {}
         minted, state = self._open_at_app(handle, app_id, spec, caller)
         if minted is None:
             return handle, state
@@ -213,7 +223,9 @@ class ContentRegistry:
         content = self._contents.get(minted)
         if content is None:
             content = Content(
-                minted, app_id, state, created_by=subject_of(caller)["subject_id"]
+                minted, app_id, state,
+                created_by=subject_of(caller)["subject_id"],
+                view_defaults=self._pending_view,
             )
             self._contents[minted] = content
         content.state = state
@@ -289,6 +301,8 @@ class ContentRegistry:
             return handle, placeholder.state
         if isinstance(answer, dict) and answer.get("handle"):
             handle = answer["handle"]
+        if isinstance(answer, dict) and isinstance(answer.get("view"), dict):
+            self._pending_view = dict(answer["view"])
         return handle, ContentState.OK
 
     def _call(self, content: Content, what: str, fn: Callable, *args) -> Any:

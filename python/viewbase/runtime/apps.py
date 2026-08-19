@@ -18,6 +18,14 @@ from ..core.addressing import Address
 from ..core.identity import Caller
 from .access_facade import AccessFacade
 from .content import SCOPES, ContentRegistry
+from .events import Needs
+
+#: Strop delky jmena skupiny v liste - kresli ho workbench a lista neni
+#: nafukovaci.
+MENU_GROUP_MAX = 24
+
+#: Typy polozek menu. Vic jich neni a zamerne nepribyva.
+MENU_ITEM_TYPES = ("command", "toggle", "choice")
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +47,11 @@ class AppRegistration:
     #: Skupiny, o jejichz clenstvi si apka rekla. Introspekce vrati JEN tyhle
     #: (D-48) - jinak se kazda apka dozvi celou pozici cloveka v organizaci.
     groups_of_interest: tuple[str, ...] = ()
+    #: Jmeno skupiny v liste. Kresli ho workbench, apka jen dodava text.
+    menu_group: str | None = None
+    #: Serverove polozky menu. Deklaruje je APKA - kdyby je smel vyhlasit
+    #: renderer, urcoval by si klient vlastni autorizaci (chyby 3.1 a 3.2).
+    menu: dict = field(default_factory=dict)
     _content: ContentRegistry | None = field(default=None, repr=False, compare=False)
     access: AccessFacade | None = field(default=None, repr=False, compare=False)
 
@@ -100,6 +113,8 @@ class AppCollection:
         capabilities: dict | None = None,
         events: dict | None = None,
         groups_of_interest: tuple[str, ...] = (),
+        menu_group: str | None = None,
+        menu: dict | None = None,
         access=None,
     ) -> AppRegistration:
         """Zapis apku. Vsechno se overuje TED, ne az za behu.
@@ -119,13 +134,24 @@ class AppCollection:
             )
 
         granted, refused = self._negotiate(app_id, capabilities or {})
+        menu = self._check_menu(app_id, menu_group, menu or {})
         declared = self._check_events(app_id, events or {})
+        collisions = set(menu) & set(events or {})
+        if collisions:
+            raise ValueError(
+                f"apka {app_id!r} ma polozku menu i udalost tehoz jmena: "
+                f"{', '.join(sorted(collisions))}"
+            )
+        declared += [
+            (f"{app_id}.{name}", {"needs": Needs(spec["needs"])})
+            for name, spec in menu.items()
+        ]
 
         address = Address.app(app_id)
         self._instance.objects.add(address, access)
         registration = AppRegistration(
             app_id, kind, scope, backend_base_url, granted, refused,
-            tuple(groups_of_interest),
+            tuple(groups_of_interest), menu_group, menu,
             self._content, AccessFacade(self._instance, address),
         )
         self._registrations[app_id] = registration
@@ -182,14 +208,51 @@ class AppCollection:
             )
         return granted, refused
 
+    def _check_menu(self, app_id: str, group: str | None, menu: dict) -> dict:
+        """Over deklaraci menu. Vsechno se rika TED, ne az v prohlizeci.
+
+        Polozka menu JE udalost, takze musi deklarovat `needs` stejne jako
+        kazda jina - jinak by existovala druha cesta k handleru a ta by se
+        prestala kontrolovat (chyba 3.1).
+        """
+        if not menu:
+            return {}
+        if not group or len(group) > MENU_GROUP_MAX:
+            raise ValueError(
+                f"apka {app_id!r} deklaruje menu, takze potrebuje menu_group "
+                f"o delce 1 az {MENU_GROUP_MAX} znaku"
+            )
+        for name, spec in menu.items():
+            if not isinstance(spec, dict) or "needs" not in spec:
+                raise ValueError(
+                    f"polozka menu {name!r} apky {app_id!r} nedeklaruje 'needs'"
+                )
+            kind = spec.get("type")
+            if kind not in MENU_ITEM_TYPES:
+                raise ValueError(
+                    f"polozka menu {name!r} apky {app_id!r} ma neznamy 'type' "
+                    f"{kind!r}; zname: {', '.join(MENU_ITEM_TYPES)}"
+                )
+            if kind == "choice" and not spec.get("options"):
+                raise ValueError(
+                    f"polozka menu {name!r} apky {app_id!r} je 'choice' a musi "
+                    f"mit 'options'"
+                )
+            if spec.get("destructive") and Needs(spec["needs"]) is not Needs.WRITE:
+                # Nevratna akce za slabsim pozadavkem je past: divak ji vidi
+                # jako dostupnou a workbench mu ji povoli.
+                raise ValueError(
+                    f"polozka menu {name!r} apky {app_id!r} je destructive "
+                    f"a musi zadat aspon needs='write'"
+                )
+        return dict(menu)
+
     def _check_events(self, app_id: str, events: dict) -> list:
         """Udalosti apky vznikaji v REGISTRU, ne vedle nej (B-16, chyba 3.1).
 
         Jmenuji se `<app_id>.<udalost>`, takze si dve apky nemohou prebit
         udalost - a je z auditu poznat, ci to byla.
         """
-        from .events import Needs, StepUp
-
         declared = []
         for name, spec in events.items():
             if not isinstance(spec, dict) or "needs" not in spec:
@@ -204,10 +267,7 @@ class AppCollection:
                     f"udalost {name!r} apky {app_id!r} zada neznamy 'needs': "
                     f"{spec['needs']!r}"
                 ) from None
-            declared.append((
-                f"{app_id}.{name}",
-                {"needs": needs, "step_up": StepUp.REQUIRED},
-            ))
+            declared.append((f"{app_id}.{name}", {"needs": needs}))
         return declared
 
 
