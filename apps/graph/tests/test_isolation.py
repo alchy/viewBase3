@@ -9,9 +9,9 @@ import pytest
 
 from graph_app import ContentRefused, GraphApp
 
-HANA = {"subject_id": "user:hana", "groups": []}
-KAREL = {"subject_id": "user:karel", "groups": []}
-ADMIN = {"subject_id": "user:workbench", "groups": ["group:administrator"]}
+HANA = {"subject_id": "user:hana", "capabilities": ["read", "write"]}
+KAREL = {"subject_id": "user:karel", "capabilities": ["read", "write"]}
+SPRAVCE = {"subject_id": "user:workbench", "capabilities": ["read", "write", "manage"]}
 
 
 @pytest.fixture
@@ -75,9 +75,10 @@ def test_cizi_obsah_se_neda_otevrit_ani_kdyz_znam_rukojet(app):
         app.content(cizi, KAREL)
 
 
-def test_spravce_projde_i_k_cizimu(app):
+def test_kdo_ma_manage_projde_i_k_cizimu(app):
+    """Apka se NEPTA, jestli je nekdo spravce - dostane hotovou odpoved."""
     cizi = app.new_content("user:hana")
-    assert app.open_content(cizi, {}, ADMIN)["handle"] == cizi
+    assert app.open_content(cizi, {}, SPRAVCE)["handle"] == cizi
 
 
 def test_vypis_ukaze_jen_sve(app):
@@ -85,4 +86,4 @@ def test_vypis_ukaze_jen_sve(app):
     app.new_content("user:karel")
     assert len(app.list_content(HANA)) == 2
     assert len(app.list_content(KAREL)) == 1
-    assert len(app.list_content(ADMIN)) == 3
+    assert len(app.list_content(SPRAVCE)) == 3

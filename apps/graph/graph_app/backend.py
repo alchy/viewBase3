@@ -23,8 +23,11 @@ from typing import Any
 
 from .model import GraphContent
 
-#: Skupina, která smí i k cizím obsahům (obdoba roota).
-ADMINISTRATOR = "group:administrator"
+#: Schopnost, která pouští i k cizím obsahům. Instance ji spočítá (vlastník
+#: nebo správce, D-41) a apka se **nedozví, kdo z nich to je** — jen že na to
+#: má. Kdyby apka dostala „je správce", musela by si pravidlo *správce smí
+#: i cizí* odvodit sama, a to je druhé místo, kde stejné pravidlo žije.
+MANAGE = "manage"
 
 
 class ContentRefused(Exception):
@@ -160,15 +163,15 @@ class GraphApp:
 
     @staticmethod
     def _may_touch(content: GraphContent, subject: dict[str, Any]) -> bool:
-        """Vlastník, nebo správce. Nic jiného apka o právech neví.
+        """Vlastník obsahu, nebo kdo má schopnost `manage`.
 
-        `groups` sem chodí z introspekce a používají se **jen na doménové
-        pravidlo apky** — ne na rozhodnutí, co poslat divákovi (to už
-        rozhodla instance).
+        Vlastnictví je doména apky, takže první podmínku vyhodnocuje sama.
+        Druhou dostane **hotovou** — instance už rozhodla; apka se neptá,
+        jestli je někdo správce, protože to k práci nepotřebuje.
         """
         if subject.get("subject_id") == content.owner:
             return True
-        return ADMINISTRATOR in (subject.get("groups") or ())
+        return MANAGE in (subject.get("capabilities") or ())
 
     @staticmethod
     def _reload(content: GraphContent) -> list:

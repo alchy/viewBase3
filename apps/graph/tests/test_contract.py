@@ -3,7 +3,7 @@ import pytest
 
 from graph_app import ContentRefused, GraphApp
 
-HANA = {"subject_id": "user:hana", "groups": []}
+HANA = {"subject_id": "user:hana", "capabilities": ["read", "write"]}
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def test_cislovani_jmen_je_na_vlastnika(app):
     """„Graph #1" má každý svoje – jinak by jméno prozradilo, kolik grafů
     má někdo jiný."""
     a = app.open_content(None, {}, HANA)["name"]
-    b = app.open_content(None, {}, {"subject_id": "user:karel", "groups": []})["name"]
+    b = app.open_content(None, {}, {"subject_id": "user:karel", "capabilities": ["read", "write"]})["name"]
     assert a == b == "Graph #1"
 
 

@@ -101,7 +101,7 @@ close_content(handle)               -> None
 ```python
 subject  = {"subject_id": "user:42" | "anonymous",
             "correlation": "c9f1…",
-            "capabilities": ["read", "write"]}    # UŽ ROZHODNUTÉ
+            "capabilities": ["read", "write", "manage"]}   # UŽ ROZHODNUTÉ
 Snapshot = {"state": {...}, "cursor": 271}
 ```
 
@@ -111,6 +111,31 @@ a apka se stává použitelnou i tam, kde žádná okna nejsou.
 
 **`subject` nikdy nenese session id ani skupiny.** Session id je přihlašovací
 údaj; skupiny by z apky udělaly druhé místo, kde se rozhoduje o právech.
+
+### Schopnosti jsou hotová odpověď, ne podklad k rozhodování
+
+| schopnost | co znamená |
+|---|---|
+| `read` | smí obsah vidět |
+| `write` | smí do něj zasahovat |
+| `manage` | smí i to, co jinak přísluší **vlastníkovi** — destruktivní akce (D-41) |
+
+`manage` dostane vlastník obsahu **a správce**. Apka se ale nedozví, **kdo
+z nich to je** — jen že na to má. Je to schválně:
+
+- kdyby apka dostala „je správce", musela by si pravidlo *správce smí i cizí*
+  odvodit sama, a to je druhé místo, kde stejné pravidlo žije. Dřív nebo
+  později se rozejde s naším,
+- schopnost pojmenovává **co ten člověk smí**, ne **kdo je**. Role je
+  informace navíc, kterou apka k práci nepotřebuje — a co nepotřebuje,
+  nemá dostat.
+
+Na **klientském kanálu** si totéž apka odvodí z introspekce (kde skupiny má,
+viz §9). Tvar je tedy na obou kanálech stejný: `manage` in `capabilities`.
+
+**V `open_content` schopnosti nejsou** a je to správně: vazba okna na obsah
+se děje **jednou**, kdežto dívání se děje **per divák**. Schopnosti chodí
+tam, kde na nich záleží — v `snapshot` a `apply_event`.
 
 ### Sdílení obsahu není sdílení přístupu
 
