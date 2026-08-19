@@ -23,9 +23,10 @@ class FakeApp:
         self.subjects: list[dict] = []
         self._cursor = cursor
 
-    def open_content(self, handle, spec):
+    def open_content(self, handle, spec, subject):
         self.opened.append((handle, spec))
-        return {"state": {"nodes": []}, "cursor": self._cursor}
+        self.subjects.append(subject)
+        return {"handle": handle, "state": {"nodes": []}, "cursor": self._cursor}
 
     def snapshot(self, handle, subject):
         self.subjects.append(subject)
@@ -42,7 +43,7 @@ class FakeApp:
 class BrokenApp(FakeApp):
     """Spadly kontejner: neodpovi na nic, ne jen na otevreni."""
 
-    def open_content(self, handle, spec):
+    def open_content(self, handle, spec, subject):
         raise ConnectionError("kontejner spadl")
 
     def snapshot(self, handle, subject):
@@ -53,9 +54,9 @@ class BrokenApp(FakeApp):
 
 
 class SlowApp(FakeApp):
-    def open_content(self, handle, spec):
+    def open_content(self, handle, spec, subject):
         time.sleep(0.4)
-        return super().open_content(handle, spec)
+        return super().open_content(handle, spec, subject)
 
 
 def with_graph(scope="app", backend=None, **kwargs):
@@ -287,6 +288,7 @@ def test_the_subject_carries_no_session_id_and_no_groups():
     w = screen.window.open("graph", id="net", app="workbench.graph")
     caller = Caller.for_user("hana", ["ucetni"], session="s1", correlation="c9f1")
 
+    backend.subjects.clear()
     instance.content.snapshot_for(w.app.handle, caller)
 
     subject = backend.subjects[-1]

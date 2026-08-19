@@ -40,6 +40,7 @@ class WindowCollection:
         title: str | None = None,
         app: str | None = None,
         handle: str | None = None,
+        by=None,
         access: Access | None = None,
     ) -> Window:
         """Otevri okno daneho typu a volitelne ho spoj s apkou.
@@ -74,14 +75,14 @@ class WindowCollection:
 
         window_app = None
         if app is not None:
-            window_app = self._bind_content(app, address, handle)
+            window_app = self._bind_content(app, address, handle, by)
 
         instance.objects.add(address, access if access is not None else Access())
         window = Window(instance, address, kind, title, window_app)
         screen._windows[window_id] = window
         return window
 
-    def _bind_content(self, app: str, address, handle: str | None) -> WindowApp:
+    def _bind_content(self, app: str, address, handle: str | None, by=None) -> WindowApp:
         """Zjisti rukojet obsahu a napoj na nej pohled."""
         instance = self._screen._instance
         registration = instance.app.get(app)
@@ -95,8 +96,10 @@ class WindowCollection:
                 )
             handle = instance.content.handle_for(app, scope, address)
 
-        if handle is not None:
-            instance.content.attach(handle, app, address, {"kind": registration.kind})
+        if handle is not None or scope not in ("session", "user"):
+            handle, _ = instance.content.attach(
+                handle, app, address, {"kind": registration.kind}, by
+            )
         return WindowApp(id=app, scope=scope, handle=handle)
 
     def _check_app(self, app: str, kind: str) -> None:

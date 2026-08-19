@@ -14,6 +14,7 @@ Tvary adres:
 
     instance:                       sama instance (vlastni ACL, sprava)
     instance:<jmeno>                objekt instance (log, audit)
+    app:<app_id>                    registrace apky (kdo ji vubec uvidi)
     screen:<id>                     plocha
     screen:<id>/window:<id>         okno na plose
 
@@ -37,7 +38,7 @@ _ID_BYTES = 9
 
 #: Co smi stat pod cim. Adresa mimo tenhle strom je chyba, ne novy tvar.
 _ALLOWED_CHILDREN = {"screen": ("window",)}
-_ALLOWED_ROOTS = ("instance", "screen")
+_ALLOWED_ROOTS = ("instance", "screen", "app")
 
 
 def new_id() -> str:
@@ -87,6 +88,16 @@ class Address:
         nikdy ACL plochy, na ktere se zrovna zobrazuje (chyba 3.4).
         """
         return cls((("instance", _validate(name, "jmeno objektu")),))
+
+    @classmethod
+    def app(cls, app_id: str) -> "Address":
+        """Registrace apky.
+
+        Je to objekt jako kazdy jiny, takze se na nej da povesit ACL a nas
+        model rozhodne, kdo apku vubec uvidi ve spousteci (D-36). Nepatri pod
+        plochu - existuje driv, nez je jake okno.
+        """
+        return cls((("app", _validate(app_id, "id apky")),))
 
     @classmethod
     def screen(cls, screen_id: str) -> "Address":

@@ -182,3 +182,17 @@ def test_screens_still_fall_to_the_instance_default():
     reg = registry(default=Acl.of(USERS))
     reg.add(PROVOZ)
     assert reg.resolve(PROVOZ, Verb.SEE) == Acl.of(USERS)
+
+
+def test_app_registrations_fall_to_the_instance_default_like_screens():
+    # Spoustec je k tomu, aby se videl; utajit apku jde ACL. Kdyby registrace
+    # koncila zavreno, neuvidi cerstve nasazena instance zadnou apku.
+    reg = registry(default=Acl.of(USERS))
+    reg.add(Address.app("example.hello"))
+    assert reg.resolve(Address.app("example.hello"), Verb.SEE) == Acl.of(USERS)
+
+
+def test_an_app_can_still_be_hidden_by_its_own_acl():
+    reg = registry(default=Acl.of(USERS))
+    reg.add(Address.app("example.hello"), Access(see=Acl.of("group:ucetni")))
+    assert reg.resolve(Address.app("example.hello"), Verb.SEE) == Acl.of("group:ucetni")

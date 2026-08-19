@@ -86,3 +86,24 @@ def test_id_that_would_break_the_address_is_rejected(bad):
 def test_parsing_a_malformed_address_fails_loudly(bad):
     with pytest.raises(ValueError):
         Address.parse(bad)
+
+
+# -- registrace apky je objekt s adresou a vlastnim ACL (D-36) -------------
+
+
+def test_app_registration_has_an_address():
+    assert str(Address.app("example.hello")) == "app:example.hello"
+
+
+def test_app_address_round_trips():
+    assert Address.parse("app:example.hello") == Address.app("example.hello")
+
+
+def test_app_address_is_top_level():
+    # Registrace apky nepatri pod plochu - existuje driv, nez je jake okno.
+    assert Address.app("example.hello").parent is None
+
+
+def test_an_app_id_with_a_slash_is_refused():
+    with pytest.raises(ValueError):
+        Address.app("example/hello")

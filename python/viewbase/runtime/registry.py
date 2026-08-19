@@ -74,12 +74,19 @@ class ObjectRegistry:
         (chyba 3.5) a uz vubec ne "kdokoli". Totez plati, kdyz zanikne rodic:
         osirely objekt nema od koho dedit a je zavreny.
 
-        DVA RUZNE VYCHOZI STAVY. Retez plochy konci `default_access` instance
-        (typicky `group:users`) - to je ta rozumna hodnota pro plochy a okna.
-        Retez instance konci ZAVRENO: auditni stopa a sprava instance, na
-        kterych nikdo ACL nenastavil, nesmi byt otevrene vsem prihlasenym
-        (par. 7). Kdyby oboji koncilo `default_access`, staci zapomenout na
-        ACL logu a je z nej verejny audit.
+        DVA RUZNE VYCHOZI STAVY, a je to rozdil mezi "co se ukazuje" a "co je
+        instance zac":
+
+          * retez plochy a registrace apky konci `default_access` instance
+            (typicky `group:users`). Plochy, okna i spoustec jsou k tomu, aby
+            se videly; utajit se daji ACL,
+          * retez instance konci ZAVRENO. Auditni stopa a sprava instance, na
+            kterych nikdo ACL nenastavil, nesmi byt otevrene vsem prihlasenym
+            (par. 7).
+
+        Kdyby oboji koncilo `default_access`, staci zapomenout na ACL logu a je
+        z nej verejny audit. Kdyby oboji koncilo zavreno, neuvidi cerstve
+        nasazena instance nic a spravce zacina tim, ze odemyka po jednom.
         """
         chain: list[Access] = []
         current: Address | None = address
@@ -90,7 +97,7 @@ class ObjectRegistry:
             current = current.parent
         default = (
             self.default_access
-            if address.segments[0][0] == "screen"
+            if address.segments[0][0] in ("screen", "app")
             else Acl.empty()
         )
         return effective_acl(verb, chain, default=default)

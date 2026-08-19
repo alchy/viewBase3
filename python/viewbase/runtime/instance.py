@@ -26,6 +26,11 @@ from ..core.identity import USERS
 from .access_facade import AccessFacade
 from .apps import AppCollection
 from .content import ContentRegistry
+
+#: Schopnosti, ktere instance udeluje, kdyz se nerekne jinak. `fetch-origin`
+#: tu zamerne NENI: je to druha cesta ven a chce vedome rozhodnuti spravce
+#: (okno-kontrakt.md par. 5).
+DEFAULT_CAPABILITIES = ("canvas2d", "webgl", "keyboard-capture", "file-drop")
 from .events import EventRegistry, Guard
 from .registry import ObjectRegistry
 from .screen import Screen
@@ -117,6 +122,7 @@ class Instance:
         audit: list[AuditRecord] | None = None,
         secret: str | bytes | None = None,
         app_timeouts: dict[str, float] | None = None,
+        capabilities: Iterable[str] = DEFAULT_CAPABILITIES,
     ) -> None:
         self.objects = ObjectRegistry(default_access=Acl.from_iterable(default_access))
         self.events = EventRegistry()
@@ -141,7 +147,10 @@ class Instance:
         self.content = ContentRegistry(
             self._secret, app_timeouts, audit=self._record_from_content
         )
-        self.app = AppCollection(self.content)
+        #: Co tahle instance vubec umi udelit. Rozhoduje se pri REGISTRACI
+        #: apky, ne za behu v cizim prohlizeci (D-40).
+        self.capabilities = frozenset(capabilities)
+        self.app = AppCollection(self)
         self.guard = Guard(events=self.events, objects=self.objects, grants=self.grants)
 
     # -- jedina cesta ke zmene prav (D-14) -------------------------------

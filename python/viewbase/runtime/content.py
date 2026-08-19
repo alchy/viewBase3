@@ -33,7 +33,7 @@ from hashlib import sha256
 from typing import Any, Protocol
 
 from ..core.addressing import Address
-from ..core.identity import Caller
+from ..core.identity import ADMINISTRATOR, Caller
 
 #: Jak se rukojet odvodi, kdyz ji nikdo nezada. Nahrazuje drivejsi
 #: `content: shared | per-session | instance` a zobecnuje ho (D-27).
@@ -47,11 +47,22 @@ _VIEWER_SCOPES = ("session", "user")
 DEFAULT_TIMEOUTS = {"open_content": 2.0, "snapshot": 2.0, "apply_event": 5.0}
 
 
+class ContentRefused(Exception):
+    """Apka pripojeni k obsahu ODMITLA.
+
+    Je to NORMALNI ODPOVED, ne chyba: neznama rukojet, cizi obsah, vycerpany
+    limit. Divak dostane ram s hlaskou. Odlisuje se od vypadku zamerne -
+    "neznam tuhle rukojet" a "spadl mi kontejner" jsou dve ruzne veci a
+    divakovi se maji rict jinak (par. 8: kazde rozhodnuti vraci duvod).
+    """
+
+
 class ContentState(Enum):
     """Stav obsahu z pohledu INSTANCE - apka o nem z definice nemuze rict nic."""
 
     OK = "ok"
     UNAVAILABLE = "unavailable"  # spadla, restartuje se, nebo neodpovida vcas
+    REFUSED = "refused"  # apka pripojeni odmitla; je to odpoved, ne porucha
 
 
 class AppBackend(Protocol):
@@ -76,6 +87,10 @@ class Content:
     app_id: str
     state: ContentState = ContentState.OK
     views: set[Address] = field(default_factory=set)
+    #: Kdo obsah zalozil. Destruktivni akce smi jen on nebo spravce (D-41):
+    #: jeden obsah muze byt ve dvou oknech s ruznymi ACL, takze pravo psat
+    #: v jednom okne nesmi znamenat pravo znicit obsah videny v druhem.
+    created_by: str | None = None
 
 
 def subject_of(caller: Caller, capabilities: list[str] | None = None) -> dict:
@@ -157,19 +172,54 @@ class ContentRegistry:
         content = self._contents.get(handle)
         return () if content is None else tuple(sorted(content.views, key=str))
 
-    def attach(self, handle: str, app_id: str, address: Address | None, spec: dict) -> ContentState:
+    def created_by(self, handle: str) -> str | None:
+        content = self._contents.get(handle)
+        return None if content is None else content.created_by
+
+    def may_destroy(self, handle: str, caller: Caller) -> bool:
+        """Smi tenhle volajici obsah znicit? (D-41)"""
+        if ADMINISTRATOR in caller.principals:
+            return True
+        return self.created_by(handle) == subject_of(caller)["subject_id"]
+
+    def attach(
+        self,
+        handle: str | None,
+        app_id: str,
+        address: Address | None,
+        spec: dict,
+        caller: Caller | None = None,
+    ) -> tuple[str | None, ContentState]:
         """Napoj pohled na obsah; kdyz jeste nezije, otevri ho u apky.
 
         Druhy pohled uz obsah neotevira znovu - je to tyz obsah.
+
+        `handle=None` znamena "zaloz novy a rekni mi jakou rukojet jsi razila"
+        (D-39: razit ji smi obe strany). Neznama rukojet se ODMITNE, nikdy
+        tise nezaklada: po preklepu by divak dostal prazdny obsah a myslel si,
+        ze prisel o data (D-38).
         """
-        content = self._contents.get(handle)
+        caller = caller or Caller.internal()
+        content = handle is not None and self._contents.get(handle)
+        if content:
+            if address is not None:
+                content.views.add(address)
+            return handle, content.state
+
+        minted, state = self._open_at_app(handle, app_id, spec, caller)
+        if minted is None:
+            return handle, state
+
+        content = self._contents.get(minted)
         if content is None:
-            content = Content(handle, app_id)
-            self._contents[handle] = content
-            self._open_at_app(content, spec)
+            content = Content(
+                minted, app_id, state, created_by=subject_of(caller)["subject_id"]
+            )
+            self._contents[minted] = content
+        content.state = state
         if address is not None:
             content.views.add(address)
-        return content.state
+        return minted, state
 
     def detach(self, handle: str, address: Address) -> None:
         """Zavreni okna je ODPOJENI POHLEDU, ne smrt obsahu (D-26).
@@ -205,11 +255,41 @@ class ContentRegistry:
             content, "snapshot", backend.snapshot, handle, subject_of(caller, capabilities)
         )
 
-    def _open_at_app(self, content: Content, spec: dict) -> None:
-        backend = self._backends.get(content.app_id)
+    def list_content(self, app_id: str, caller: Caller) -> list:
+        """Z ceho si divak muze vybrat (D-37).
+
+        Filtruje APKA - vlastnictvi obsahu jsou jeji data; my rozhodujeme
+        o oknech. Spadla apka da prazdny seznam, ne vyjimku: spoustec se kvuli
+        jedne mrtve apce nesmi rozbit.
+        """
+        backend = self._backends.get(app_id)
+        if backend is None or not hasattr(backend, "list_content"):
+            return []
+        placeholder = Content("-", app_id)
+        result = self._call(
+            placeholder, "snapshot", backend.list_content, subject_of(caller)
+        )
+        return result or []
+
+    def _open_at_app(
+        self, handle: str | None, app_id: str, spec: dict, caller: Caller
+    ) -> tuple[str | None, ContentState]:
+        """Otevri nebo pripoj obsah u apky. Vrat rukojet a stav."""
+        backend = self._backends.get(app_id)
         if backend is None:
-            return
-        self._call(content, "open_content", backend.open_content, content.handle, spec)
+            # Lokalni obsah: dodava ho kod, ktery okno otevrel.
+            return handle, ContentState.OK
+
+        placeholder = Content(handle or "-", app_id)
+        answer = self._call(
+            placeholder, "open_content", backend.open_content, handle, spec,
+            subject_of(caller),
+        )
+        if placeholder.state is not ContentState.OK:
+            return handle, placeholder.state
+        if isinstance(answer, dict) and answer.get("handle"):
+            handle = answer["handle"]
+        return handle, ContentState.OK
 
     def _call(self, content: Content, what: str, fn: Callable, *args) -> Any:
         """Zavolej apku s casovym limitem a preloz selhani na STAV.
@@ -221,6 +301,14 @@ class ContentRegistry:
             result = self._pool.submit(fn, *args).result(self._timeouts.get(what, 2.0))
         except FutureTimeout:
             self._mark_unavailable(content, what, "neodpovedela vcas")
+            return None
+        except ContentRefused as refusal:
+            # Odmitnuti je odpoved, ne porucha - a divakovi se rika jinak.
+            content.state = ContentState.REFUSED
+            self._audit(
+                "content", "content_refused",
+                detail=f"{content.app_id} {what}: {refusal}",
+            )
             return None
         except Exception as problem:  # apka je cizi kod; nesmi shodit instanci
             self._mark_unavailable(content, what, f"{type(problem).__name__}: {problem}")
