@@ -39,6 +39,9 @@ w.table(["měsíc", "částka"], rows)
 w.button("export", "Exportovat", on_click=export)
 ```
 
+Kdo obsah dodává, se určuje při otevření okna (`app=`, viz
+[typy-oken.md](typy-oken.md) §2b); bez něj ho dodává kód, který okno otevřel.
+
 Úroveň C je výjimka, ne výchozí stav. Kdo ji chce, musí ji při registraci
 **vyžádat** a Workbench ji povolí na základě stupně důvěry (§5).
 

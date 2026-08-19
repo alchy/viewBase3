@@ -105,6 +105,56 @@ Tři pole stojí za vysvětlení:
   / `local` (nikdy neopustí prohlížeč). Hover a pohyb kamery nemají na
   serveru co dělat.
 
+## 2b. Kdo řekne, že okno krmí zrovna tahle apka
+
+`kind` a `app_id` jsou dvě osy — a musí je někdo **spojit**. Dělá to ten, kdo
+okno otevírá, tedy workbench. Nikdy apka sama:
+
+```python
+w = screen.window.open("panel", id="hello",       # kind: jak se to vykreslí
+                       title="Hello",
+                       app="example.hello")        # app_id: odkud je obsah
+```
+
+Bez `app=` je obsah **lokální** — dodá ho kód, který okno otevřel. S `app=`
+posílá instance `snapshot` i události do té apky.
+
+Celý řetěz od registrace po vykreslení:
+
+```
+1. apka se zaregistruje                   → registr zná app_id "example.hello"
+   (POST na registr, nebo deklarace v konfiguraci u vestavěných)
+
+   { "app_id": "example.hello",
+     "kind": "panel",                       ← který renderer používá
+     "content": "per-session",
+     "backend_base_url": "http://hello-app:8080",
+     "events": { "hello_submit": { "needs": "write", "profile": "request" } } }
+
+2. workbench otevře okno a spojí osy      → screen.window.open("panel", …, app="example.hello")
+                                             vazba (screen:ahoj/window:hello) → example.hello
+
+3. instance zavolá apku                   → create_instance(ref, spec, subject)
+                                             ref = {screen, window[, correlation]}
+
+4. klient dostane kind + obsah            → vykreslí rendererem "panel"
+```
+
+**Apka se na okno nepřihlašuje sama.** Kdyby mohla, byl by to způsob, jak se
+přilepit na cizí plochu. Zná jen ty instance, které dostala — žádné „vypiš
+plochy" neexistuje a cizí `ref` v odpovědi instance odmítne a zapíše.
+
+### Neznámá a nedostupná apka jsou dvě různé věci
+
+| kdy | co se stane |
+|---|---|
+| `app=` **není v registru** při otevírání okna | `open()` **selže hned**, se seznamem registrovaných apek — chytá to překlepy |
+| apka je registrovaná, ale **neodpovídá** (spadlý kontejner, restart) | okno se otevře jako rám s hláškou „obsah není dostupný"; instance na ni **nečeká** a ostatní okna to nezdrží |
+
+Rozdíl je podstatný: první případ je chyba autora a má se ozvat okamžitě,
+druhý je provozní stav a nesmí zastavit workbench. Bez toho rozlišení jedna
+mrtvá apka zdrží celou instanci — a přesně to v původním konceptu chybělo.
+
 ## 3. Vestavěné typy: stejná pravidla, jiná cena
 
 **Vestavěný typ používá tentýž veřejný kontrakt jako publikovaný.** Rozdíl

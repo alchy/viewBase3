@@ -179,10 +179,26 @@ Tři věci bych udělal jinak:
 politika a mělo by bydlet na jednom místě:
 
 ```python
-window.access.see.add("group:ucetni")
+window.access.see.set(["group:ucetni"])       # vlastní ACL okna; končí dědění
+window.access.see.add("user:hana")            # …a ještě konkrétní člověk
 window.access.write.set(["user:hana"])
 window.access.require_authentication = True   # chce kód, i když ACL projde
 ```
+
+**`add` a `remove` fungují jen na objektu, který už vlastní ACL má.** Na
+objektu, který dědí, obojí **skončí chybou** s návodem — a je to schválně.
+Kdyby `add` na dědícím okně prošlo, musí si vybrat mezi dvěma výklady a oba
+jsou špatně:
+
+| výklad | co udělá | proč je špatně |
+|---|---|---|
+| začni od **vlastního** (prázdného) | okno dědící `see=[users]` se po `add("group:ucetni")` stane viditelným **jen účetním** | slovo „přidej" viditelnost **zúžilo** |
+| začni od **efektivního** | vyjde `[users, ucetni]`, jak čtenář čeká | **zmrazí dědičnost** — pozdější zúžení plochy už na okno nedosáhne, a to je cesta k úniku |
+
+Druhý výklad selhává **tiše a otevřeně** (lidé vidí, co nemají), první
+**hlučně a zavřeně** (někdo si stěžuje, že nevidí). Proto se nevybírá ani
+jeden: kdo chce oknu dát vlastní ACL, napíše `set([...])` a je z toho vidět,
+že dědění končí. Model zůstává „první nastavený člen řetězu vyhrává".
 
 **b) `Acl` je neměnná hodnota, ale zápis zůstává čitelný.** Tyhle dvě věci
 si na první pohled odporují (a chvíli si v tomhle dokumentu opravdu
@@ -199,11 +215,17 @@ a co je API**:
 window.access.see.add("group:ucetni")     # čte se jako knihovna (D-01)
    ↓
 instance.set_access(address, Verb.SEE, acl.with_added("group:ucetni"), by=caller)
-   ↓  audit: access change: screen:provoz/window:mzdy see +group:ucetni
+   ↓  audit: access change: screen:provoz/window:mzdy see +group:ucetni by=internal
 ```
 
 Fasáda **není měnitelná `Acl` v přestrojení**: čtení vrací snímek
 (`window.access.see.list()`), zápis jde jedinou cestou přes instanci.
+
+**`by` je v záznamu vždycky**, i když změnu udělal vlastní kód knihovny —
+tam je hodnota `internal`. Až budou práva chodit i po drátě, ponese totéž
+pole skutečného volajícího; kdyby vzniklo teprve tehdy, nedají se starší
+záznamy porovnat s novějšími. Prázdné pole je horší než pole s hodnotou
+„vlastní kód".
 `window.access.require_authentication = True` je totéž — je to politika
 a audituje se stejně jako ACL.
 
