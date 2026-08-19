@@ -201,6 +201,61 @@ v něm vznikl únik.
 **Pravidlo:** vestavěné okno smí použít jen to, co je dostupné i apce.
 Rozdíl je v tom, že se u něj neplatí za izolaci — ne v tom, co umí.
 
+## 5b. Menu okna: dvě skupiny, dva vlastníci
+
+Aktivní okno přispěje do lišty **dvě skupiny** a rozdíl mezi nimi je
+skutečný: jedna mění jen to, co vidí ten jeden divák, druhá může změnit
+obsah všem a může mu být zakázaná.
+
+```
+Options   View   Graph   System   User: jindra
+          └─┬┘   └──┬─┘
+     renderer      apka — skupina se jmenuje PODLE APKY
+```
+
+| | `View` | skupina apky |
+|---|---|---|
+| kdo položky deklaruje | **renderer** | **apka** (registrace nebo `view` blok v `open_content`) |
+| kam dosáhnou | nikam, `profile: local` | `apply_event`, přes naše brány |
+| autorizace | žádná — mění jen můj pohled | `needs`, může být zašedlá |
+| příklad u grafu | fyzika, 2D/3D, splajny, zvýraznění | Reload from source, Rename…, Exit |
+
+`Options` zůstává **workbenchi** (zamknout okno, velikost, dok) a v těchhle
+dvou skupinách nemá co dělat.
+
+**Kdo položku vlastní, se pozná podle toho, kde leží odpověď:** je-li
+v prohlížeči („jak se to kreslí"), patří rendereru; je-li v apce („co ta
+data jsou"), patří apce. „Reset zoom" je renderer, „Reload from source" je
+apka — sporné případy tím padnou samy.
+
+Tři typy položek stačí: **`command`** (akce), **`toggle`** (přepínač s ✓),
+**`choice`** (výběr — 2D/3D je volba, ne dva přepínače).
+
+### Pravidla, která to drží
+
+- **Prázdná skupina se nezobrazí.** Okno bez apky má jen `View`; renderer bez
+  voleb nemá ani to.
+- **Položka menu JE událost.** Jde do téhož registru a rozhoduje o ní týž
+  Guard — menu nemá vlastní větev vynucování.
+- **`destructive: true` vyžaduje aspoň `needs: write`** a odmítne se **při
+  registraci**. Jinak by si apka omylem nechala mazat obsah divákem, který
+  má jen právo se dívat.
+- **Destruktivní položku smí použít jen vlastník obsahu nebo správce**
+  (jeden obsah může být ve dvou oknech s různými ACL).
+- **Zašedlá, ne skrytá.** Kdo okno vidí, ale na akci nemá, položku vidí
+  zašedlou — „tohle nemůžeš" je srozumitelnější než „tohle neexistuje".
+  Kdo okno nevidí, nedostane menu vůbec, jako by okno nebylo.
+  **Podmínka:** popisek položky je statický z registrace, nikdy odvozený
+  z obsahu. `Rename…` je v pořádku; `Smazat graf od hany` by přes zašedlou
+  položku prozradil data.
+- **Jméno skupiny apky pochází z registrace** (vidí ho správce), má **strop
+  24 znaků** a vykresluje ho workbench svým tématem. Jinak si apka do lišty
+  napíše, co chce.
+- **Apka smí nastavit výchozí hodnoty voleb rendereru** (`view` blok
+  v `open_content`), ale ne je odebírat. Co pro daná data nedává smysl,
+  schová si **renderer sám** — on ta data vidí. Neznámá volba se zahodí
+  a zapíše, jednou při otevírání okna.
+
 ## 6. Mantinely na zdroje
 
 - **Takt místo vlastní smyčky.** Modul nekreslí přes `requestAnimationFrame`,
