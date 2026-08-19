@@ -39,16 +39,33 @@ class NamedContent:
     vyjadritelna. To je silnejsi nez ji kontrolovat.
 
     `title` je promenlivy zamerne: prejmenovani dokumentu za behu se ma
-    projevit v menu vsude, kde na nej nabidka odkazuje (D-66).
+    projevit v menu vsude, kde na nej nabidka odkazuje (D-66). Zmena ale jde
+    pres instanci a audituje se (D-71).
     """
 
-    __slots__ = ("handle", "title", "access", "app")
+    __slots__ = ("handle", "_title", "access", "app")
 
     def __init__(self, handle, title, access, app) -> None:
         self.handle = handle
-        self.title = title
+        self._title = title
         self.access = access
         self.app = app
+
+    @property
+    def title(self) -> str | None:
+        return self._title
+
+    @title.setter
+    def title(self, value: str | None) -> None:
+        """Prejmenovani jde PRES INSTANCI a zapise auditni radek (D-71).
+
+        Neni to prosty atribut: prejmenovani je zasah do toho, co lide v menu
+        vidi, a kdyz zmizi z auditu, zmizi i odpoved na "kdo to prejmenoval".
+        Autorizace (manage) se vynucuje na ceste UDALOSTI - kod knihovny ve
+        stejnem procesu autorizaci neprochazi, ale audit neobchazi nikdo.
+        """
+        self.app.instance.set_title(self.handle, value, previous=self._title)
+        self._title = value
 
     def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
         return f"<Content {self.title!r} of {self.app.app_id}>"

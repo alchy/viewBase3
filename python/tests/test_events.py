@@ -215,12 +215,25 @@ def test_read_event_needs_read_on_the_screen_and_on_the_window():
     assert guard.check(Caller.for_user("petr"), "window_focus", MZDY).verdict is Verdict.NOT_IN_ACL
 
 
-def test_write_event_needs_read_on_the_window_too():
-    # Zasahovat do neceho, co clovek nevidi, nema smysl - a rozdil mezi
-    # "nevidim" a "nesmim psat" je duvod, ktery patri do auditu.
+def test_a_writer_is_never_stopped_by_the_read_check():
+    # PREPSANO podle D-70. Drive to byl test, ze "zasahovat do neceho, co
+    # nevidim" neprojde - jenze ten stav uz nejde napsat: write implikuje
+    # read, takze kdo je ve write, je i v efektivnim read. Sipka to zavrela
+    # v modelu misto ve vynucovani.
     objects = ObjectRegistry(default_access=Acl.empty())
     objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
     objects.add(MZDY, Access(read=Acl.of("group:ucetni"), write=Acl.of(USERS)))
+    registry = EventRegistry()
+    registry.register("hello_submit", noop, needs=Needs.WRITE)
+    guard = guard_over(objects, registry)
+
+    assert guard.check(Caller.for_user("petr"), "hello_submit", MZDY)
+
+
+def test_someone_outside_both_acls_is_still_stopped():
+    objects = ObjectRegistry(default_access=Acl.empty())
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(MZDY, Access(read=Acl.of("group:ucetni"), write=Acl.of("group:ucetni")))
     registry = EventRegistry()
     registry.register("hello_submit", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)

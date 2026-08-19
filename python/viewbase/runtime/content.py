@@ -70,16 +70,25 @@ class AppBackend(Protocol):
     tim ostrejsi, ne volnejsi - a apka se stava pouzitelnou i tam, kde zadna
     okna nejsou.
 
-    APKA O PRAVECH NEROZHODUJE NIC (D-52). Drive tu byl `list_content`
-    filtrovany apkou a moznost pripojeni odmitnout; oboji
-    zaniklo, protoze prava obsahu se prestehovala k nam - obsah ma vlastni
-    adresu a vlastni ACL. Autor apky tim nema CO pokazit.
+    APKA O PRAVECH NEROZHODUJE NIC (D-52, D-72). `list_content()` nebere
+    subjekt a NEFILTRUJE - filtrovat podle vlastnictvi je nutne spatne,
+    protoze ACL obsahu drzi instance: kdo ma read na sdileny dokument
+    a nezalozil ho, by ho ve spousteci nevidel. Moznost pripojeni odmitnout
+    zanikla ze stejneho duvodu.
+
+    ZALOZIT A OTEVRIT JSOU DVE VOLANI (D-72, nalez F-24). Jedno volani
+    s vetvi `handle is None` znamenalo, ze si apka rukojet razi sama - a to
+    je proti D-29: instance-razena rukojet prezije restart apky, apkou razena
+    ne. Rozdelene je "neznama rukojet" i "obsazena rukojet" hlasita
+    a symetricka chyba.
     """
 
-    def open_content(self, handle: str | None, spec: dict, subject: dict) -> dict: ...
+    def create_content(self, handle: str, spec: dict, subject: dict) -> dict: ...
+    def open_content(self, handle: str, subject: dict) -> dict: ...
     def snapshot(self, handle: str, subject: dict) -> dict: ...
     def apply_event(self, handle: str, subject: dict, event: dict) -> list: ...
     def close_content(self, handle: str) -> None: ...
+    def list_content(self) -> list: ...
 
 
 @dataclass
@@ -180,6 +189,9 @@ class ContentRegistry:
         if backend is not None:
             self._backends[app_id] = backend
 
+    def __contains__(self, handle: str) -> bool:
+        return handle in self._contents
+
     def state(self, handle: str) -> ContentState | None:
         content = self._contents.get(handle)
         return None if content is None else content.state
@@ -250,6 +262,7 @@ class ContentRegistry:
         address: Address | None,
         spec: dict,
         caller: Caller | None = None,
+        from_outside: bool = False,
     ) -> tuple[str | None, ContentState]:
         """Napoj pohled na obsah; kdyz jeste nezije, otevri ho u apky.
 
@@ -269,7 +282,9 @@ class ContentRegistry:
             return handle, content.state
 
         self._pending_view = {}
-        minted, state = self._open_at_app(handle, app_id, spec, caller)
+        minted, state = self._open_at_app(
+            handle, app_id, spec, caller, from_outside=from_outside
+        )
         if minted is None:
             return handle, state
 
@@ -338,7 +353,8 @@ class ContentRegistry:
 
 
     def _open_at_app(
-        self, handle: str | None, app_id: str, spec: dict, caller: Caller
+        self, handle: str | None, app_id: str, spec: dict, caller: Caller,
+        from_outside: bool = False,
     ) -> tuple[str | None, ContentState]:
         """Otevri nebo pripoj obsah u apky. Vrat rukojet a stav."""
         backend = self._backends.get(app_id)
@@ -347,10 +363,20 @@ class ContentRegistry:
             return handle, ContentState.OK
 
         placeholder = Content(handle or "-", app_id)
-        answer = self._call(
-            placeholder, "open_content", backend.open_content, handle, spec,
-            subject_of(caller),
-        )
+        # Rukojet zvenci (z konfigurace, od davkove ulohy) znamena, ze obsah
+        # u apky uz existuje - otevira se. Rukojet, kterou jsme prave razili,
+        # znamena novy obsah - zaklada se. Zalozit misto otevreni by prepsalo
+        # cizi data, otevrit misto zalozeni by selhalo na neznamou rukojet.
+        if from_outside:
+            answer = self._call(
+                placeholder, "open_content", backend.open_content, handle,
+                subject_of(caller),
+            )
+        else:
+            answer = self._call(
+                placeholder, "open_content", backend.create_content, handle, spec,
+                subject_of(caller),
+            )
         if placeholder.state is not ContentState.OK:
             return handle, placeholder.state
         if isinstance(answer, dict) and answer.get("handle"):

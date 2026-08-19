@@ -119,9 +119,12 @@ def test_object_and_screen_without_acl_fall_to_the_instance_default():
 
 
 def test_inheritance_is_per_verb():
-    # Okno zdedi `read` od plochy, ale `write` ma vlastni.
+    # Okno zdedi `read` od plochy, ale `write` ma vlastni. Efektivni read je
+    # po D-70 SJEDNOCENI, takze hana je v nem taky - smi menit, tedy smi videt.
     chain = [Access(write=Acl.of("user:hana")), Access(read=Acl.of(PUBLIC))]
-    assert effective_acl(Verb.READ, chain, default=Acl.empty()) == Acl.of(PUBLIC)
+    assert effective_acl(Verb.READ, chain, default=Acl.empty()) == Acl.of(
+        PUBLIC, "user:hana"
+    )
     assert effective_acl(Verb.WRITE, chain, default=Acl.empty()) == Acl.of("user:hana")
 
 
@@ -158,3 +161,60 @@ def test_access_is_a_value():
     assert Access(read=Acl.of(PUBLIC), step_up=True) == Access(
         read=Acl.of(PUBLIC), step_up=True
     )
+
+
+# ===========================================================================
+# Sipka ukazuje jednim smerem: manage => write => read (D-70)
+#
+# Kdo ma manage, ma i write; kdo ma write, ma i read. OPACNE NE - write
+# nikoho nepovysuje na manage. Obe implikace zaviraji tutez chybu o patro
+# jinde: kdo smi menit ACL, si write udeli jednim krokem (odepirat ho je
+# divadlo), a editovat neco, na co se neda divat, nedava smysl.
+# ===========================================================================
+
+
+def test_write_implies_read():
+    # Efektivni read je sjednoceni: kdo smi menit, smi i videt.
+    access = Access(read=Acl.of("group:ctenari"), write=Acl.of("group:pisari"))
+    assert effective_acl(Verb.READ, [access], default=Acl.empty()) == Acl.of(
+        "group:ctenari", "group:pisari"
+    )
+
+
+def test_read_does_not_imply_write():
+    # Sipka jednim smerem. Kdyby platila i opacne, byla by slovesa jedno.
+    access = Access(read=Acl.of("group:ctenari"), write=Acl.of("group:pisari"))
+    assert effective_acl(Verb.WRITE, [access], default=Acl.empty()) == Acl.of(
+        "group:pisari"
+    )
+
+
+def test_someone_who_may_only_write_may_also_read():
+    access = Access(read=Acl.empty(), write=Acl.of("user:hana"))
+    assert allowed({"user:hana"}, effective_acl(Verb.READ, [access], default=Acl.empty()))
+
+
+def test_write_is_always_a_subset_of_effective_read():
+    """Invariant, ne priklad: pro KAZDOU dvojici ACL musi platit
+    write podmnozina read_effective."""
+    kombinace = [
+        (Acl.empty(), Acl.empty()),
+        (Acl.of("a"), Acl.empty()),
+        (Acl.empty(), Acl.of("b")),
+        (Acl.of("a"), Acl.of("b")),
+        (Acl.of("a", "b"), Acl.of("b")),
+        (Acl.of("a"), Acl.of("a", "b")),
+    ]
+    for read, write in kombinace:
+        access = Access(read=read, write=write)
+        eff_read = effective_acl(Verb.READ, [access], default=Acl.empty())
+        eff_write = effective_acl(Verb.WRITE, [access], default=Acl.empty())
+        assert eff_write.principals <= eff_read.principals, (read, write)
+
+
+def test_the_implication_survives_inheritance():
+    # Okno dedi read od plochy a ma vlastni write - i tak plati sipka.
+    chain = [Access(write=Acl.of("user:hana")), Access(read=Acl.of(USERS))]
+    eff_read = effective_acl(Verb.READ, chain, default=Acl.empty())
+    assert "user:hana" in eff_read
+    assert USERS in eff_read

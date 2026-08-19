@@ -59,13 +59,24 @@ class AclView:
         self._verb = verb
 
     def list(self) -> list[str]:
-        """Snimek toho, co na objektu STOJI. Cteni nikdy nevybuchne.
+        """Snimek prav NASTAVENYCH na objektu - ale EFEKTIVNE (D-70).
 
-        Objekt, ktery dedi, vraci prazdny seznam - ne zdedene hodnoty. Je to
-        odpoved na otazku "co jsem tady nastavil", ne "kdo to vidi".
+        U `read` se pricitaji i clenove `write`, protoze sipka ukazuje jednim
+        smerem: kdo smi menit, smi i videt. Vypis, ktery by ukazal doslovnou
+        deklaraci `read=[auditori]` a zamlcel, ze hana ma `write`, svede
+        spravce k zaveru, ze hana nectе - a ona cte. Zpetne cteni prav proto
+        tiskne vzdycky to, co plati, ne to, co je napsane.
+
+        Objekt, ktery dedi, vraci prazdny seznam - je to odpoved na otazku
+        "co jsem tady nastavil", ne "kdo to vidi". Cteni nikdy nevybuchne.
         """
         own = self._owner.own_acl(self._address, self._verb)
-        return [] if own is None else list(own)
+        members = set(own) if own is not None else set()
+        if self._verb is Verb.READ:
+            write = self._owner.own_acl(self._address, Verb.WRITE)
+            if write is not None:
+                members |= set(write)
+        return sorted(members)
 
     @property
     def inherits(self) -> bool:

@@ -24,10 +24,13 @@ class FakeApp:
         self.subjects: list[dict] = []
         self._cursor = cursor
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         self.opened.append((handle, spec))
         self.subjects.append(subject)
         return {"handle": handle, "state": {"nodes": []}, "cursor": self._cursor}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         self.subjects.append(subject)
@@ -44,8 +47,11 @@ class FakeApp:
 class BrokenApp(FakeApp):
     """Spadly kontejner: neodpovi na nic, ne jen na otevreni."""
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         raise ConnectionError("kontejner spadl")
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         raise ConnectionError("kontejner spadl")
@@ -55,10 +61,13 @@ class BrokenApp(FakeApp):
 
 
 class SlowApp(FakeApp):
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         time.sleep(0.4)
         return super().open_content(handle, spec, subject)
 
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
 def with_graph(scope="app", backend=None, **kwargs):
     instance = vb.Instance(**kwargs)

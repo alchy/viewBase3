@@ -152,10 +152,12 @@ ROOT = Address.instance_root()
 
 
 def test_instance_object_inherits_from_the_instance_itself():
+    # Efektivni read je po D-70 sjednoceni read a write - spravce, ktery smi
+    # do logu zasahovat, ho taky vidi.
     reg = registry(default=Acl.of(USERS))
     reg.add(ROOT, Access(read=Acl.of("group:auditor"), write=Acl.of(ADMINISTRATOR)))
     reg.add(LOG)
-    assert reg.resolve(LOG, Verb.READ) == Acl.of("group:auditor")
+    assert reg.resolve(LOG, Verb.READ) == Acl.of("group:auditor", ADMINISTRATOR)
 
 
 def test_instance_object_never_falls_to_the_instance_default():

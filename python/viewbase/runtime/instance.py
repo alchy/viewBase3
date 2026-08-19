@@ -264,6 +264,18 @@ class Instance:
                 f"{name} neni znam zdroji identit - preklep?", level="warning",
             )
 
+    def set_title(self, handle: str, title: str | None, previous=None) -> None:
+        """Prejmenuj obsah a zapis o tom auditni radek.
+
+        Tataz cesta jako u zmeny prav: hodnota o auditu nevi nic, kdo/kdy/co
+        pripoji az instance. Prejmenovani je zasah do toho, co lide v menu
+        vidi - kdyz zmizi z auditu, zmizi i odpoved na "kdo to prejmenoval".
+        """
+        self._security(
+            "title", Address.content(handle), None,
+            f"{previous!r} -> {title!r}",
+        )
+
     def serve(self, *args, **kwargs):
         """Obsad port, otevri WebSocket a rozjed vysilaci smycku (D-55).
 

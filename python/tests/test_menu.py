@@ -24,11 +24,14 @@ class FakeApp:
     def __init__(self, view=None):
         self.view = view
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         answer = {"handle": handle, "state": {}, "cursor": 1}
         if self.view is not None:
             answer["view"] = self.view
         return answer
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {}, "cursor": 1}

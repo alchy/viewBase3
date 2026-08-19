@@ -38,8 +38,11 @@ def open_window(screen, kind="panel", **kwargs):
 class _Nic:
     """Apka, ktera nedela nic - pro testy, kde jde jen o ram okna."""
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         return {"handle": handle, "state": {}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {}, "cursor": 1}

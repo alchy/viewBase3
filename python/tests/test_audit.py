@@ -339,8 +339,11 @@ def test_an_unavailable_content_stays_an_ordinary_record():
     import viewbase as vb
 
     class Spadla:
-        def open_content(self, handle, spec, subject):
+        def create_content(self, handle, spec, subject):
             raise ConnectionError("spadla")
+
+        def open_content(self, handle, subject):
+            return self.create_content(handle, {}, subject)
 
         def snapshot(self, handle, subject):
             raise ConnectionError("spadla")

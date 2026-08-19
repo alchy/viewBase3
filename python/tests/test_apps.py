@@ -18,12 +18,15 @@ class FakeApp:
         self.opened = []
         self.subjects = []
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         self.subjects.append(subject)
         handle = handle or "app_minted_1"  # apka si rukojet razi sama
         self.known.add(handle)
         self.opened.append(handle)
         return {"handle": handle, "state": {}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {}, "cursor": 1}
@@ -38,13 +41,16 @@ class FakeApp:
 class OpenApp(FakeApp):
     """Apka, ktera prijme kazdou rukojet (vytvor nebo pripoj)."""
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         self.subjects.append(subject)
         handle = handle or "app_minted_1"
         self.known.add(handle)
         self.opened.append(handle)
         return {"handle": handle, "state": {}, "cursor": 1}
 
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
 def instance_with(app=None, **kwargs):
     instance = vb.Instance(**kwargs)
@@ -250,13 +256,15 @@ def test_the_app_can_no_longer_refuse_a_connection():
     assert not hasattr(content_module.ContentState, "REFUSED")
 
 
-def test_the_app_contract_no_longer_lists_content():
+def test_the_app_contract_lists_content_without_deciding_anything():
+    # D-72: vypis se vratil, ale bez subjektu - apka nefiltruje. A zalozit
+    # a otevrit jsou dve volani, aby si apka nemohla razit vlastni rukojeti.
     import inspect
 
     from viewbase.runtime.content import AppBackend
 
-    assert not hasattr(AppBackend, "list_content")
-    assert list(inspect.signature(AppBackend.open_content).parameters) == [
+    assert list(inspect.signature(AppBackend.list_content).parameters) == ["self"]
+    assert list(inspect.signature(AppBackend.create_content).parameters) == [
         "self", "handle", "spec", "subject",
     ]
 

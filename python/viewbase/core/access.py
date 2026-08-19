@@ -131,7 +131,27 @@ def effective_acl(verb: Verb, chain: Sequence[Access], default: Acl) -> Acl:
 
     Prazdna `Acl` je nastavena hodnota: kdo napsal "nikdo", nechce, aby se
     to dedicnosti prepsalo na "kdokoli".
+
+    SIPKA UKAZUJE JEDNIM SMEREM (D-70): `write` implikuje `read`, opacne ne.
+    Efektivni read je proto SJEDNOCENI obou - kdo smi menit obsah, smi ho
+    i videt; editovat neco, na co se neda divat, nedava smysl. Naopak read
+    nikoho nepovysuje na write, jinak by slovesa byla jedno.
+
+    Dusledek, ktery je snadne prehlednout: `read` se uz nemusi opakovat, ale
+    KAZDE ZPETNE CTENI musi tisknout tuhle efektivni mnozinu, ne doslovnou
+    deklaraci. Vypis, ktery ukaze read=[auditori] a zamlci, ze hana ma write,
+    svede spravce k zaveru, ze hana necte - a ona cte.
     """
+    if verb is Verb.READ:
+        return Acl(
+            _first_set(Verb.READ, chain, default).principals
+            | _first_set(Verb.WRITE, chain, default).principals
+        )
+    return _first_set(verb, chain, default)
+
+
+def _first_set(verb: Verb, chain: Sequence[Access], default: Acl) -> Acl:
+    """Prvni clen retezu, ktery ma sloveso nastavene - bez implikaci."""
     for access in chain:
         acl = access.for_verb(verb)
         if acl is not None:

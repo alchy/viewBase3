@@ -270,6 +270,14 @@ class WindowCollection:
         registration = instance.app.get(app)
         scope = registration.scope
 
+        # ZVENCI je jen rukojet, kterou nam nekdo PREDAL - z konfigurace, od
+        # davkove ulohy, z nabidky pripnute k pojmenovanemu obsahu. Takovy
+        # obsah u apky uz existuje a OTEVIRA se. Rukojet, kterou si odvodime
+        # sami, znamena novy obsah a ZAKLADA se. Poradi je dulezite: kdyby se
+        # to pocitalo az po odvozeni, vypadala by kazda cerstva rukojet jako
+        # cizi a obsah by se nikdy nezalozil.
+        from_outside = handle is not None and handle not in instance.content
+
         if handle is None:
             if scope == "explicit":
                 # Nabidka bez obsahu u `explicit`: dokument vznikne az
@@ -281,7 +289,8 @@ class WindowCollection:
 
         if handle is not None or scope not in ("session", "user"):
             handle, _ = instance.content.attach(
-                handle, app, address, {"kind": registration.kind}, by
+                handle, app, address, {"kind": registration.kind}, by,
+                from_outside=from_outside,
             )
             self._check_view_defaults(app, address, handle, registration.kind)
         return WindowApp(id=app, scope=scope, handle=handle)

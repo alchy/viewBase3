@@ -24,8 +24,11 @@ class ExcelApp:
 
     manifest = {"app_id": "excel", "kind": "panel", "scope": "explicit"}
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         return {"handle": handle, "state": {"cells": {}}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {"cells": {}}, "cursor": 1}

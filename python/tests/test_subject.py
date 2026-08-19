@@ -24,9 +24,12 @@ class RecordingApp:
     def __init__(self):
         self.subjects = []
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         self.subjects.append(subject)
         return {"handle": handle, "state": {}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         self.subjects.append(subject)
@@ -48,10 +51,13 @@ class OwnershipApp(RecordingApp):
     a to plati dal.
     """
 
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         assert subject["subject_id"] != "anonymous", "interni volani neni anonym"
-        return super().open_content(handle, spec, subject)
+        return super().create_content(handle, spec, subject)
 
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
 def prepared(backend=None, **kwargs):
     instance = vb.Instance(**kwargs)
@@ -249,21 +255,27 @@ def test_the_app_still_never_learns_a_group():
 # ===========================================================================
 
 
-def test_the_protocol_declares_the_subject_on_open_content():
-    parameters = list(inspect.signature(AppBackend.open_content).parameters)
-    assert parameters == ["self", "handle", "spec", "subject"]
+def test_the_protocol_declares_the_subject_on_both_ways_in():
+    assert list(inspect.signature(AppBackend.create_content).parameters) == [
+        "self", "handle", "spec", "subject",
+    ]
+    assert list(inspect.signature(AppBackend.open_content).parameters) == [
+        "self", "handle", "subject",
+    ]
 
 
-def test_the_protocol_no_longer_lists_content():
-    # D-52: vyber obsahu filtrovany apkou zanikl spolu s tim, ze apka
-    # o pravech nerozhoduje nic.
-    assert not hasattr(AppBackend, "list_content")
+def test_the_protocol_lists_content_without_filtering():
+    # D-72: vypis se vratil, ale bez subjektu - filtrovat podle vlastnictvi
+    # je nutne spatne, protoze ACL obsahu drzi instance (nalez F-23).
+    assert list(inspect.signature(AppBackend.list_content).parameters) == ["self"]
 
 
 @pytest.mark.parametrize(
     "method,expected",
     [
-        ("open_content", ["self", "handle", "spec", "subject"]),
+        ("create_content", ["self", "handle", "spec", "subject"]),
+        ("open_content", ["self", "handle", "subject"]),
+        ("list_content", ["self"]),
         ("snapshot", ["self", "handle", "subject"]),
         ("apply_event", ["self", "handle", "subject", "event"]),
         ("close_content", ["self", "handle"]),
@@ -310,3 +322,89 @@ def test_capabilities_come_out_in_the_declared_order():
     window.access.write.set(["group:users"])
 
     assert window.capabilities_for(Caller.for_user("hana")) == ["read", "write", "manage"]
+
+
+# ===========================================================================
+# AppBackend po D-72: apka nema zadny autorizacni kod
+# ===========================================================================
+
+
+def test_the_protocol_splits_creating_from_opening():
+    # D-24/F-24: 'zaloz novy' a 'otevri existujici' byly jedno volani s vetvi
+    # `handle is None`. Rozdelene je oboji hlasite a symetricke - a rukojet
+    # razi INSTANCE, protoze jen tak prezije restart apky (D-29).
+    import inspect
+
+    assert list(inspect.signature(AppBackend.create_content).parameters) == [
+        "self", "handle", "spec", "subject",
+    ]
+    assert list(inspect.signature(AppBackend.open_content).parameters) == [
+        "self", "handle", "subject",
+    ]
+
+
+def test_the_protocol_never_lets_the_app_mint_a_handle():
+    # `handle` je u obou PRVNI argument a nikdy neni volitelny - apka tedy
+    # nema jak si rukojet vymyslet.
+    import inspect
+
+    for method in ("create_content", "open_content"):
+        parameters = inspect.signature(getattr(AppBackend, method)).parameters
+        assert parameters["handle"].default is inspect.Parameter.empty
+
+
+def test_listing_no_longer_takes_a_subject():
+    # D-72: apka nefiltruje. Filtrovat vypis podle vlastnictvi je nutne
+    # spatne, protoze ACL obsahu drzi instance - kdo ma read na sdileny
+    # dokument a nezalozil ho, by ho ve spousteci nevidel (nalez F-23).
+    import inspect
+
+    assert list(inspect.signature(AppBackend.list_content).parameters) == ["self"]
+
+
+def test_a_new_content_is_created_not_opened():
+    class Sleduje(RecordingApp):
+        def __init__(self):
+            super().__init__()
+            self.vytvorene, self.otevrene = [], []
+
+        def create_content(self, handle, spec, subject):
+            self.vytvorene.append(handle)
+            return {"state": {}, "cursor": 1}
+
+        def open_content(self, handle, subject):
+            self.otevrene.append(handle)
+            return {"state": {}, "cursor": 1}
+
+    backend = Sleduje()
+    _, screen = prepared(backend)
+    from conftest import open_window
+
+    okno = open_window(screen, "graph", id="net", app="workbench.graph")
+    assert backend.vytvorene == [okno.app.handle]
+    assert backend.otevrene == []
+
+
+def test_a_handle_that_comes_from_outside_is_opened_not_created():
+    # Rukojet ulozena v konfiguraci pred mesicem: obsah uz u apky existuje,
+    # takze se otevira, ne zaklada. Zalozit ho znovu by prepsalo cizi data.
+    class Sleduje(RecordingApp):
+        def __init__(self):
+            super().__init__()
+            self.vytvorene, self.otevrene = [], []
+
+        def create_content(self, handle, spec, subject):
+            self.vytvorene.append(handle)
+            return {"state": {}, "cursor": 1}
+
+        def open_content(self, handle, subject):
+            self.otevrene.append(handle)
+            return {"state": {}, "cursor": 1}
+
+    backend = Sleduje()
+    _, screen = prepared(backend)
+    from conftest import open_window
+
+    open_window(screen, "graph", id="net", app="workbench.graph", handle="vb1_zvenci")
+    assert backend.otevrene == ["vb1_zvenci"]
+    assert backend.vytvorene == []

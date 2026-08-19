@@ -19,8 +19,11 @@ from conftest import open_window, register_app
 
 
 class FakeApp:
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         return {"handle": handle, "state": {}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {}, "cursor": 1}

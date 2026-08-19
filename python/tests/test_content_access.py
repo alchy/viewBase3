@@ -25,8 +25,11 @@ from conftest import open_window, register_app
 
 
 class FakeApp:
-    def open_content(self, handle, spec, subject):
+    def create_content(self, handle, spec, subject):
         return {"handle": handle, "state": {}, "cursor": 1}
+
+    def open_content(self, handle, subject):
+        return self.create_content(handle, {}, subject)
 
     def snapshot(self, handle, subject):
         return {"state": {}, "cursor": 1}
@@ -106,9 +109,12 @@ def test_the_content_can_narrow_writing_alone():
 
 
 def test_a_wide_content_does_not_widen_a_narrow_window():
-    # Prunik, ne sjednoceni: druha uroven smi jen ubirat.
+    # Prunik, ne sjednoceni: druha uroven smi jen ubirat. Zuzit je potreba
+    # OBE slovesa okna - po D-70 by samotne read nestacilo, protoze write
+    # implikuje read.
     instance, _, window = prepared()
     window.access.read.set(["group:ucetni"])
+    window.access.write.set(["group:ucetni"])
     instance.content.access(window.app.handle).read.set([USERS])
     assert window.capabilities_for(Caller.for_user("petr")) == []
 
@@ -291,10 +297,21 @@ def test_the_founder_keeps_manage_while_they_still_have_read():
 
 
 def test_narrowing_the_window_alone_also_takes_manage():
-    # Prunik ma dva cleny; zuzit staci kterykoli z nich.
+    # Prunik ma dva cleny; zuzit staci kterykoli z nich - ale u okna je nutne
+    # zuzit OBE slovesa: samotne read nestaci, protoze write implikuje read
+    # (D-70). Presne tohle je ta past, kvuli ktere se vypis prav musi tisknout
+    # efektivne.
     instance, window, hana = zalozeno_hanou()
     window.access.read.set(["group:auditor"])
+    window.access.write.set(["group:auditor"])
     assert window.capabilities_for(hana) == []
+
+
+def test_narrowing_read_alone_leaves_a_writer_reading():
+    # Dukaz te pasti: kdo zuzi jen read a mysli si, ze zavrel, nezavrel nic.
+    instance, window, hana = zalozeno_hanou()
+    window.access.read.set(["group:auditor"])
+    assert "read" in window.capabilities_for(hana)
 
 
 def test_the_administrator_gets_back_in_after_a_narrowing():
@@ -330,3 +347,86 @@ def test_an_offer_disappears_when_the_content_is_narrowed_under_it():
     cnt.access.read.set(["group:auditor"])
 
     assert scr.app.visible_to(hana) == ()
+
+
+# ===========================================================================
+# Prejmenovani je pod autoritou instance (D-71)
+# ===========================================================================
+
+
+def pojmenovany():
+    from tests.test_offer import GraphApp
+
+    instance = vb.Instance(default_access=[USERS])
+    app = instance.app.register(GraphApp())
+    return instance, app.content.open(title="Mapa")
+
+
+def test_renaming_a_content_is_recorded():
+    # Prejmenovani je zasah do toho, co lide v menu vidi - kdyz zmizi
+    # z auditu, zmizi i odpoved na "kdo to prejmenoval".
+    instance, cnt = pojmenovany()
+    cnt.title = "Topologie"
+    assert any(r.action == "title" for r in instance.audit)
+
+
+def test_the_record_says_the_old_and_the_new_title():
+    instance, cnt = pojmenovany()
+    cnt.title = "Topologie"
+    detail = instance.audit[-1].detail
+    assert "Mapa" in detail and "Topologie" in detail
+
+
+def test_the_record_points_at_the_content():
+    instance, cnt = pojmenovany()
+    cnt.title = "Topologie"
+    assert instance.audit[-1].address == Address.content(cnt.handle)
+
+
+def test_renaming_survives_the_strictest_threshold():
+    from tests.test_offer import GraphApp
+
+    instance = vb.Instance(default_access=[USERS], log_level="error")
+    app = instance.app.register(GraphApp())
+    cnt = app.content.open(title="Mapa")
+    cnt.title = "Topologie"
+    assert any(r.action == "title" for r in instance.audit)
+
+
+def test_the_title_still_reads_back():
+    _, cnt = pojmenovany()
+    cnt.title = "Topologie"
+    assert cnt.title == "Topologie"
+
+
+def test_reading_the_title_is_not_an_audit_event():
+    instance, cnt = pojmenovany()
+    before = len(instance.audit)
+    _ = cnt.title
+    assert len(instance.audit) == before
+
+
+def test_a_founder_who_may_read_but_not_write_gets_no_manage():
+    """D-70: manage vyzaduje WRITE, ne read.
+
+    Tenhle test vznikl z toho, ze sabotaz (zmena podminky z write zpatky na
+    read) NESHODILA NIC - zadny z 587 testu ty dva stavy neodlisoval. Je to
+    tyz druh mezery jako F-22, jen o jedno slovo vedle.
+    """
+    instance, window, hana = zalozeno_hanou()
+    window.access.read.set([USERS])
+    window.access.write.set(["group:ucetni"])   # hana v uctarne neni
+
+    capabilities = window.capabilities_for(hana)
+    assert capabilities == ["read"]
+    assert "manage" not in capabilities
+
+
+def test_the_same_founder_gets_manage_back_once_they_may_write():
+    instance, window, hana = zalozeno_hanou()
+    window.access.read.set([USERS])
+    window.access.write.set(["group:ucetni"])
+    assert "manage" not in window.capabilities_for(hana)
+
+    window.access.write.set([USERS])
+    assert "manage" in window.capabilities_for(hana)

@@ -632,3 +632,33 @@ def test_a_registration_keeps_what_the_document_declared():
     registration = instance.app.get("example.hello")
     assert registration.scope == "session"
     assert registration.backend_base_url == "http://hello-app:8080"
+
+
+# ===========================================================================
+# Zpetne cteni prav tiskne EFEKTIVNI mnozinu (D-70)
+# ===========================================================================
+
+
+def test_reading_the_access_prints_what_holds_not_what_is_written():
+    # Vypis, ktery ukaze read=[auditori] a zamlci, ze hana ma write, svede
+    # spravce k zaveru, ze hana nectе - a ona cte.
+    _, _, window = prepared()
+    window.access.read.set(["group:auditor"])
+    window.access.write.set(["user:hana"])
+    assert window.access.read.list() == ["group:auditor", "user:hana"]
+
+
+def test_the_write_list_is_not_widened_by_read():
+    # Sipka jednim smerem: read nikoho nepovysuje na write.
+    _, _, window = prepared()
+    window.access.read.set(["group:auditor"])
+    window.access.write.set(["user:hana"])
+    assert window.access.write.list() == ["user:hana"]
+
+
+def test_the_printed_read_is_always_a_superset_of_the_printed_write():
+    _, _, window = prepared()
+    for read, write in [(["a"], ["b"]), (["a", "b"], ["b"]), ([], ["c"])]:
+        window.access.read.set(read)
+        window.access.write.set(write)
+        assert set(window.access.write.list()) <= set(window.access.read.list())
