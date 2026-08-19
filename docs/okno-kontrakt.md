@@ -33,7 +33,7 @@ obsah**.
 
 ```python
 # úroveň A – vývojář nepíše řádek JS
-w = screen.panel("mzdy", title="Mzdy")
+w = screen.window.open("panel", id="mzdy", title="Mzdy")
 w.heading("Výplaty")
 w.table(["měsíc", "částka"], rows)
 w.button("export", "Exportovat", on_click=export)

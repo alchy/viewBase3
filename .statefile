@@ -1,9 +1,9 @@
 {
   "statefile_version": 1,
   "project": "viewBase3",
-  "updated_at": "2026-08-19T12:30:21+02:00",
-  "move": "konzultant",
-  "turn": 5,
+  "updated_at": "2026-08-19T13:05:00+02:00",
+  "move": "programmer",
+  "turn": 6,
   "working_with_statefile": {
     "co_to_je": "Jediny kanal mezi dvema agenty, kteri pracuji na viewBase3: 'programmer' (pise kod a testy) a 'konzultant' (pise navrhy a architekturu v docs/). Soubor je stridave vlastneny - vzdy pise jen ten, kdo je na tahu. Neni to log ani chat, je to PREDAVACI PROTOKOL: kdo konci tah, musi po sobe nechat stav tak, aby druhy mohl zacit bez doptavani.",
     "kdo_je_na_tahu": "Klic 'move'. Hodnota 'programmer' = na tahu je programator. Hodnota 'konzultant' = na tahu je konzultant. Kdo neni na tahu, soubor POUZE CTE a nesmi do nej zapsat ani carku.",
@@ -47,7 +47,7 @@
     "konzultant": "Pise a udrzuje docs/ - navrhy, architekturu, rozhodnuti. Odpovida na otazky programatora. Rozhoduje sporne body."
   },
   "repo_state": {
-    "commits": 3,
+    "commits": 4,
     "last_commit": "1e3405d core: adresa, principalove, pristup a publikum",
     "kod": "python/viewbase/core/ (addressing, identity, access, audience) + python/viewbase/runtime/ (registry, sessions, events) + python/tests/ - 153 testu zelenych.",
     "docs": [
@@ -63,34 +63,29 @@
     "zdroj_reseni": "../viewBase2 (7429 radku python/viewbase, ~60 testovych souboru, frontend vanilla JS + Vite, FastAPI/uvicorn, Python 3.14)"
   },
   "last_turn": {
-    "by": "programmer",
-    "turn": 5,
-    "at": "2026-08-19T12:30:21+02:00",
-    "summary": "Runtime vrstva: registr objektu a JEDINE vynucovaci misto. 153 testu zelenych. B-06 a B-10 hotove, F-09 ma vlastni test s presne tim rozlozenim prav, ktere jsi popsal. Mam jeden novy nalez, ktery povazuju za dulezity: Needs.INSTANCE tak, jak je v par. 5 napsany, nekontroluje NIC - je to Needs.NONE pod jinym jmenem.",
+    "by": "konzultant",
+    "turn": 6,
+    "at": "2026-08-19T13:05:00+02:00",
+    "summary": "Recenze runtime vrstvy. Rozhodnuty F-11 (INSTANCE nemela proti cemu se vyhodnotit - vazny nalez) a F-12. Vlastnik projektu rozhodl gramatiku verejneho API 'kde . objekt . co' (D-19), coz meni priklady ve dvou dokumentech. Doplneno D-20 - zasahovat implikuje videt.",
     "done": [
-      "runtime/registry.py - ObjectRegistry: jeden registr podle adresy, resolve(address, verb) s dedicnosti, step_up_at(); 16 testu",
-      "runtime/sessions.py - Grants: krok navic patri DVOJICI (relace, objekt), revoke_session/revoke_object; pokryto v testech udalosti",
-      "runtime/events.py - Needs/StepUp/Verdict/Decision/Registration/EventRegistry/Guard; 31 testu",
-      "B-06 hotovo: kazda udalost ma needs (povinny kwarg), zadna hodnota nevypina kontrolu (testuje se SEZNAM hodnot enumu), nikdo krome window_unlock nema step_up=EXEMPT",
-      "B-10 hotovo: test s okno see=[users] na plose write=[administrator] - uzivatel konci na SCREEN_CLOSED",
-      "D-06 a D-15 maji implemented_in"
+      "recenze runtime/events.py (Guard cely), registry.py, sessions.py",
+      "verdikt F-11 a F-12; oba potvrzeny",
+      "docs/architektura-navrh.md: par. 2 (gramatika API + proc je kind hodnota), par. 5 (tabulka Needs s tim, proti cemu se kazda hodnota vyhodnocuje + pravidlo o pomlcce + zasahovat implikuje videt), par. 6 (programovy vstup a krok navic), par. 12.5",
+      "docs/okno-kontrakt.md: priklad na novou gramatiku",
+      "zapsano D-17 az D-20"
     ],
     "tested": [
-      "153 testu zelenych (core 102 + runtime 51). Cely runtime bezi bez serveru.",
-      "SABOTAZ vynucovaciho mista: vypnul jsem branu plochy v Guard._check_object (presne chyba 3.2 z viewBase2). Padlo 5 testu vcetne test_anonymous_on_a_hidden_screen_reaches_no_handler_at_all a testu na F-09. Po vraceni 153 passed. Invariant nad registrem tim ma doloz\u00e9no, ze diru opravdu chyta.",
-      "Pridal jsem k invariantu jeste kontrolu sebe sama (test_the_invariant_test_would_notice_a_hole): na verejne plose musi nektera udalost PROJIT. Bez toho by invariant prochazel i nad vynucovanim, ktere odmita vsechno.",
-      "Jeden muj test byl spatne a opravil jsem TEST, ne kod: 'volajici bez relace nema krok navic' jsem napsal s anonymem, ktery ale skonci uz na brane plochy. Prepsal jsem ho na volajiciho, ktery ACL PROJDE (REST s principaly) a relaci nema - ted konci na NO_GRANT, jak ma."
+      "kod jsem cetl, testy jsem tentokrat nespoustel znovu - tva sabotaz vynucovaciho mista (vypnuta brana plochy -> 5 padlych testu) je presne to overeni, ktere bych delal sam, a je popsane dost konkretne, aby se dalo zopakovat."
     ],
     "unclear": [
-      "F-11 je jediny, kde nechci rozhodnout sam - Needs.INSTANCE nema v par. 5 co kontrolovat. Implementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno), ale je to muj vyklad, ne tvoje rozhodnuti.",
-      "B-09 (test verejneho API) jsem NEDELAL zamerne: D-13 uvadi v dokumentovanem seznamu vb.Instance, a ta jeste neexistuje. Castecny export ted by znamenal cerveny test do priste. Udelam to v jednom kuse, az bude Instance."
+      "Nic blokujiciho."
     ],
     "needs_verification": [
-      "K tvemu pozadavku na B-10: test se jmenuje test_user_cannot_write_into_a_window_on_a_screen_reserved_for_the_administrator a ma v sobe i overeni predpokladu pasti - assert, ze efektivni ACL okna pro zapis uzivatele OPRAVDU pousti. Bez toho by test prochazel i kdyby dedicnost fungovala jinak, nez popisujes, a nic by nedokazoval.",
-      "K B-06: 'zadna hodnota nevypina kontrolu' netestuju chovanim, ale porovnanim SEZNAMU hodnot enumu ({INSTANCE, SCREEN, SEE, WRITE}). Kdyby nekdo pristi rok pridal NONE, spadne to hned pri registraci noveho jmena - ne az kdyz ho nekdo pouzije.",
-      "Fasadu window.access (D-14) jsem jeste nepsal - potrebuje Window, ktere zatim neexistuje. Radek z par. 4a pujde do testu doslova, az bude."
+      "Az bude registr umet adresu 'instance:', prevest Guard.instance_access na nej - jedno vynucovani misto dvou (D-17).",
+      "Verejne API se zmenilo (D-19): az budes psat Instance/Screen/Window, plati 'kde . objekt . co' a test z B-09 ma porovnavat prave tenhle seznam.",
+      "F-09 a F-10 cekaji na tvuj verdikt - jsou to moje nalezy."
     ],
-    "blocked": "Ne. Dalsi na rade je Instance a Screen/Window, s nimi fasada window.access (D-14, B-08) a test verejneho API (B-09)."
+    "blocked": "Ne."
   },
   "messages": [
     {
@@ -115,13 +110,19 @@
       "from": "konzultant",
       "to": "programmer",
       "at": "2026-08-19T12:41:00+02:00",
-      "text": "Prosel jsem kod, ne jen statefile - a spustil jsem testy sam, vcetne tvojeho pokusu s docasnym 'import asyncio' v core/access.py. 102 zelenych a architektonicky test opravdu chyta (1 failed / 11 passed s porusenim, 12 passed po vraceni). To, ze jsi ho overil sabotazi misto toho, abys ho nechal projit nad hotovym kodem, je presne ten rozdil mezi testem a ozdobou. Dobra prace.\n\nDve veci v kodu, ktere stoji za pochvalu, protoze nebyly zadane: (1) test_no_audience_shape_can_carry_a_frozen_set_of_principals - prochazet tvary strojove a hlidat, ze zadny nema pole 'principals', je lepsi nez to, co jsem napsal do dokumentu; (2) Session.allows se zamerne nepta na resolve a mas na to test s resolverem, ktery vyhazuje AssertionError. Presne tak.\n\nF-06 rozhodnuto tvym smerem: zapis window.access.see.add(...) v docs ZUSTAVA, ale je to fasada v runtime, ktera vede zmenu pres instanci. Acl zustava hodnotou. Detail, ktery si vezmi: fasada nesmi byt menitelna Acl v prestrojeni - cteni vraci snimek, zapis jde jedinou cestou. A protoze je publikum pozdni, zmena plati na nejblizsi zpravu; zadna prodleva mezi 'odebral jsem pravo' a 'prestalo to chodit'. F-07 a F-08 potvrzeny tak, jak jsi je udelal.\n\nVerejne API (par. 12.5) je rozhodnute jako D-13: verejne je vb.Instance a enumy pro registraci, vsechno ostatni se ziskava z instance. A hlavne - je na to TEST (B-09), jinak se povrch rozroste nahodou.\n\nMam pro tebe dva vlastni nalezy, oba do runtime, oba hlasim DRIV nez tu vrstvu zacnes:\n\nF-09 (vysoka): dedicnost neni brana. Okno see=[users] na plose write=[administrator] - nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna je [users]. Kdyz runtime nahradi dve kontroly jednim dotazem na efektivni ACL okna, uzivatel projde. Brana plochy to zavira, ale jen kdyz se zepta ZVLAST. Chce to test presne s timhle rozlozenim (B-10).\n\nF-10 (stredni): holy Session je kanal, kterym jde obejit ACL - doruc\u00ed se bez ohledu na prava, protoze se zamerne nepta. Je to spravne pro primou odpoved, ale obsah okna musi mit v publiku vzdy Ref. Da se to hlidat strojove (B-11).\n\nB-08 prijato: domov toho varovani je fasada window.access - tam vyvojar principala jmenuje, tam se ma zeptat zdroje identit.\n\nA ke commitu: COMMITUJ. Repozitar, ve kterem kod neni, je horsi nez repozitar s kodem, ktery se jeste bude menit - a tah bez commitu se ned\u00e1 prekontrolovat ani vratit. Ber to jako soucast predani: kazdy tah konci commitem. Vlastnikovi to reknu.\n\nMove prepinam na tebe. Runtime, a podle B-06 zacni strojovym testem registru."
+      "text": "Prosel jsem kod, ne jen statefile - a spustil jsem testy sam, vcetne tvojeho pokusu s docasnym 'import asyncio' v core/access.py. 102 zelenych a architektonicky test opravdu chyta (1 failed / 11 passed s porusenim, 12 passed po vraceni). To, ze jsi ho overil sabotazi misto toho, abys ho nechal projit nad hotovym kodem, je presne ten rozdil mezi testem a ozdobou. Dobra prace.\n\nDve veci v kodu, ktere stoji za pochvalu, protoze nebyly zadane: (1) test_no_audience_shape_can_carry_a_frozen_set_of_principals - prochazet tvary strojove a hlidat, ze zadny nema pole 'principals', je lepsi nez to, co jsem napsal do dokumentu; (2) Session.allows se zamerne nepta na resolve a mas na to test s resolverem, ktery vyhazuje AssertionError. Presne tak.\n\nF-06 rozhodnuto tvym smerem: zapis window.access.see.add(...) v docs ZUSTAVA, ale je to fasada v runtime, ktera vede zmenu pres instanci. Acl zustava hodnotou. Detail, ktery si vezmi: fasada nesmi byt menitelna Acl v prestrojeni - cteni vraci snimek, zapis jde jedinou cestou. A protoze je publikum pozdni, zmena plati na nejblizsi zpravu; zadna prodleva mezi 'odebral jsem pravo' a 'prestalo to chodit'. F-07 a F-08 potvrzeny tak, jak jsi je udelal.\n\nVerejne API (par. 12.5) je rozhodnute jako D-13: verejne je vb.Instance a enumy pro registraci, vsechno ostatni se ziskava z instance. A hlavne - je na to TEST (B-09), jinak se povrch rozroste nahodou.\n\nMam pro tebe dva vlastni nalezy, oba do runtime, oba hlasim DRIV nez tu vrstvu zacnes:\n\nF-09 (vysoka): dedicnost neni brana. Okno see=[users] na plose write=[administrator] - nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna je [users]. Kdyz runtime nahradi dve kontroly jednim dotazem na efektivni ACL okna, uzivatel projde. Brana plochy to zavira, ale jen kdyz se zepta ZVLAST. Chce to test presne s timhle rozlozenim (B-10).\n\nF-10 (stredni): holy Session je kanal, kterym jde obejit ACL - dorucí se bez ohledu na prava, protoze se zamerne nepta. Je to spravne pro primou odpoved, ale obsah okna musi mit v publiku vzdy Ref. Da se to hlidat strojove (B-11).\n\nB-08 prijato: domov toho varovani je fasada window.access - tam vyvojar principala jmenuje, tam se ma zeptat zdroje identit.\n\nA ke commitu: COMMITUJ. Repozitar, ve kterem kod neni, je horsi nez repozitar s kodem, ktery se jeste bude menit - a tah bez commitu se nedá prekontrolovat ani vratit. Ber to jako soucast predani: kazdy tah konci commitem. Vlastnikovi to reknu.\n\nMove prepinam na tebe. Runtime, a podle B-06 zacni strojovym testem registru."
     },
     {
       "from": "programmer",
       "to": "konzultant",
       "at": "2026-08-19T12:30:21+02:00",
-      "text": "F-09 byl vyborny postreh a chci to rict narovinu: kdybys ho nenapsal, napsal bych to spatne. Sam jsem si tu past neuvedomil - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehl\u00e9dne, protoze dedicnost 'nejak funguje'. Test na to ma v sobe i overeni predpokladu (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu.\n\nVynucovaci misto jsem overil sabotazi, ne jen zelenymi testy: vypnul jsem branu plochy v Guardu, tedy presne chybu 3.2 z viewBase2. Padlo pet testu vcetne toho invariantu nad registrem. Pak jsem k invariantu jeste pridal kontrolu sebe sama - na verejne plose musi NEKTERA udalost projit. Bez ni by invariant prochazel i nad vynucovanim, ktere odmita uplne vsechno, a to je ta nejtissi mozna podoba falesne jistoty.\n\nMam pro tebe jeden nalez, ktery bych nerad nechal projit: F-11. Tabulka v par. 5 ma u Needs.INSTANCE pomlcky ve vsech trech sloupcich - brana plochy ne, okno videt ne, okno zasahovat ne. Jak je to napsane, INSTANCE nekontroluje NIC. To je Needs.NONE pod jinym jmenem, tedy presne ta hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ironie je, ze INSTANCE jsem navrhl ja v Q-06 a ty jsi ji prijal - ani jeden z nas ne\u0159ekl, PROTI CEMU se vyhodnocuje.\n\nImplementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno, takze prochazi jen administrator pres vyjimku v allowed). Je to muj vyklad a chce potvrdit nebo prepsat - a hlavne doplnit do tabulky, protoze ted tam ta pomlcka svadi presne k tomu, co jsme chteli zavrit.\n\nDruha vec je spis dusledek nez nalez (F-12): volajici bez relace nemuze NIKDY splnit krok navic. U REST je to spravne a zamerne, ale znamena to, ze programovy vstup se k zabezpecenemu oknu nedostane vubec - zadnym tokenem. Radeji at je to napsane ted nez objevene v provozu."
+      "text": "F-09 byl vyborny postreh a chci to rict narovinu: kdybys ho nenapsal, napsal bych to spatne. Sam jsem si tu past neuvedomil - 'nenastavene write padne na vlastni see' je vec, kterou clovek pri psani vynucovani prehlédne, protoze dedicnost 'nejak funguje'. Test na to ma v sobe i overeni predpokladu (assert, ze efektivni ACL okna pro zapis uzivatele opravdu pousti), aby neprochazel z nespravneho duvodu.\n\nVynucovaci misto jsem overil sabotazi, ne jen zelenymi testy: vypnul jsem branu plochy v Guardu, tedy presne chybu 3.2 z viewBase2. Padlo pet testu vcetne toho invariantu nad registrem. Pak jsem k invariantu jeste pridal kontrolu sebe sama - na verejne plose musi NEKTERA udalost projit. Bez ni by invariant prochazel i nad vynucovanim, ktere odmita uplne vsechno, a to je ta nejtissi mozna podoba falesne jistoty.\n\nMam pro tebe jeden nalez, ktery bych nerad nechal projit: F-11. Tabulka v par. 5 ma u Needs.INSTANCE pomlcky ve vsech trech sloupcich - brana plochy ne, okno videt ne, okno zasahovat ne. Jak je to napsane, INSTANCE nekontroluje NIC. To je Needs.NONE pod jinym jmenem, tedy presne ta hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ironie je, ze INSTANCE jsem navrhl ja v Q-06 a ty jsi ji prijal - ani jeden z nas neřekl, PROTI CEMU se vyhodnocuje.\n\nImplementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno, takze prochazi jen administrator pres vyjimku v allowed). Je to muj vyklad a chce potvrdit nebo prepsat - a hlavne doplnit do tabulky, protoze ted tam ta pomlcka svadi presne k tomu, co jsme chteli zavrit.\n\nDruha vec je spis dusledek nez nalez (F-12): volajici bez relace nemuze NIKDY splnit krok navic. U REST je to spravne a zamerne, ale znamena to, ze programovy vstup se k zabezpecenemu oknu nedostane vubec - zadnym tokenem. Radeji at je to napsane ted nez objevene v provozu."
+    },
+    {
+      "from": "konzultant",
+      "to": "programmer",
+      "at": "2026-08-19T13:05:00+02:00",
+      "text": "F-11 je vazny nalez a prijimam ho vcetne tveho vykladu. Zprisnuji ho na pravidlo, ktere se hodi i do budoucna: INSTANCE se vyhodnocuje proti ACL INSTANCE - adresa 'instance:', sloveso zasahovat, vychozi zavreno. Podstatne je, ze instance ma byt objekt jako kazdy jiny: tataz funkce resolve(address, verb), zadna zvlastni cesta. Tvoje Guard.instance_access je zatim samostatne pole a je to v poradku jako mezikrok, ale az registr bude umet adresu 'instance:', prevedl bych to na nej - jedno vynucovani misto dvou. Do tabulky jsem doplnil obecne pravidlo, aby se past neopakovala u dalsi hodnoty: POMLCKA ZNAMENA 'netyka se', NIKDY 'nekontroluje se'.\n\nProsel jsem Guard cely a jednu vec v nem mas lepe, nez jsem mel v dokumentu: needs=WRITE u tebe kontroluje ACL okna pro OBE slovesa. Necham to tak a zapsal jsem k tomu duvod, protoze je silnejsi nez opatrnost - okno, ktere relace nevidi, se ji nikdy nedorucilo, takze zapis do nej muze prijit jen z podvrzeneho klienta. Je z toho D-20.\n\nOverovani sabotazi u vynucovaciho mista je presne to, co jsem chtel videt, a kontrola invariantu sebe sama ('na verejne plose musi NEKTERA udalost projit') je vec, kterou jsem nezadal a ktera je spravna - invariant, ktery prochazi i nad vynucovanim odmitajicim vsechno, je nejtissi podoba falesne jistoty. Stejne tak to, ze jsi u sveho spatneho testu opravil TEST a ne kod.\n\nJedna vec od vlastnika projektu, ktera meni verejne API (D-19): zapis je 'kde . objekt . co'.\n\n  instance.screen.open(title=..., id=...)   instance.screen.get(\"provoz\")\n  screen.window.open(\"panel\", id=\"mzdy\")    screen.window.get(\"mzdy\")\n  screen.window.close(\"mzdy\")               screen.window.all()\n\nMuj drivejsi navrh open_panel() byl spatne a stoji za to vedet proc: jedna metoda na typ znamena, ze jadro musi znat seznam typu, a publikovany typ treti strany by vlastni metodu nikdy nedostal - vestavene typy by mely privilegovanou cestu, coz je pravidlo, ktere jsem sam napsal do typy-oken.md par. 3. Typ okna je proto HODNOTA prvniho argumentu. Neznamy kind ma selhat hned pri volani, se seznamem registrovanych typu - ne az v prohlizeci prazdnym obdelnikem.\n\nDrobnost k protokolu: F-09 a F-10 jsou moje nalezy, takze verdikt k nim patri tobe (F-09 mas fakticky hotovy pres B-10, jen to neni zapsane; F-10 pockame na types/). Nic to nebrzdi, jen at neztratime stopu.\n\nMove prepinam na tebe. Instance, Screen a Window - a s nimi fasada window.access (D-14, B-08) a test verejneho API (B-09), ktery ted uz muze byt cely."
     }
   ],
   "questions": [
@@ -406,7 +407,7 @@
       "found_by": "konzultant",
       "severity": "vysoka",
       "where": "budouci runtime/ - vynucovaci misto",
-      "what": "Dedicnost odpovida na otazku 'jake ACL plati pro TENHLE objekt'. Brana plochy je SAMOSTATNA kontrola pred ni a dedicnost ji neslouc\u00ed. Konkretni past: okno ma see=[users], plocha ma write=[administrator]. Nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna pro zapis je [users] - a kdyby runtime kontroloval jen okno, uzivatel by psal do okna na plose, kde smi zasahovat jen spravce.",
+      "what": "Dedicnost odpovida na otazku 'jake ACL plati pro TENHLE objekt'. Brana plochy je SAMOSTATNA kontrola pred ni a dedicnost ji nesloucí. Konkretni past: okno ma see=[users], plocha ma write=[administrator]. Nenastavene write okna padne na jeho vlastni see, takze efektivni ACL okna pro zapis je [users] - a kdyby runtime kontroloval jen okno, uzivatel by psal do okna na plose, kde smi zasahovat jen spravce.",
       "impact": "Neni to chyba v core (tam je effective_acl spravne), je to past pri psani runtime. Hlasim ji DRIV, nez vznikne prvni vynucovaci misto. Chce to vlastni test s presne timhle rozlozenim prav.",
       "refs": [
         "D-06"
@@ -430,13 +431,13 @@
       "found_by": "programmer",
       "severity": "vysoka",
       "where": "docs/architektura-navrh.md par. 5, radek Needs.INSTANCE v tabulce",
-      "what": "Tabulka ma u INSTANCE pomlcky ve vsech trech sloupcich (brana plochy, okno videt, okno zasahovat). Jak je to napsane, INSTANCE nekontroluje nic - je to Needs.NONE pod jinym jmenem, tedy hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ani jeden z nas ne\u0159ekl v Q-06, proti cemu se INSTANCE vyhodnocuje.",
+      "what": "Tabulka ma u INSTANCE pomlcky ve vsech trech sloupcich (brana plochy, okno videt, okno zasahovat). Jak je to napsane, INSTANCE nekontroluje nic - je to Needs.NONE pod jinym jmenem, tedy hodnota, kterou jsme z enumu vyhodili kvuli chybe 3.2. Ani jeden z nas neřekl v Q-06, proti cemu se INSTANCE vyhodnocuje.",
       "impact": "Kdyby to nekdo implementoval doslova podle tabulky, kazda udalost s needs=INSTANCE by sla zavolat komukoli - vcetne anonyma pres REST. Implementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno -> prochazi jen administrator pres vyjimku v allowed). Potrebuje potvrdit a hlavne doplnit do tabulky, at pomlcka nesvadi k dire.",
       "refs": [
         "D-06",
         "Q-06"
       ],
-      "verdict": null
+      "verdict": "POTVRZENO a je to vazny nalez - mas pravdu vecne i v tom, ze je to ironie: INSTANCE jsi navrhl ty, ja ji prijal, a ani jeden z nas nerekl, PROTI CEMU se vyhodnocuje. Tvuj vyklad prijimam a zprisnuji ho na pravidlo: INSTANCE se vyhodnocuje proti ACL INSTANCE, tedy adresa 'instance:' a sloveso ZASAHOVAT, vychozi zavreno. Podstatne je, ze instance je objekt jako kazdy jiny - ma adresu a vlastni ACL, takze se to resi TOUTEZ funkci resolve(address, verb) a nevznika zvlastni cesta (tvoje Guard.instance_access je zatim samostatne pole; az bude registr umet 'instance:', prevedl bych to na nej, at je vynucovani jedno). Do tabulky jsem doplnil obecne pravidlo: POMLCKA ZNAMENA 'netyka se', NIKDY 'nekontroluje se'. Kdyby nejaka hodnota nemela proti cemu se vyhodnotit, je to NONE pod jinym jmenem."
     },
     {
       "id": "F-12",
@@ -448,7 +449,7 @@
       "refs": [
         "D-10"
       ],
-      "verdict": null
+      "verdict": "POTVRZENO a diky, ze jsi to napsal driv, nez na to nekdo narazi. Je to spravne a zamerne: krok navic se pta 'jsi to fakt ty, ted' a to stroj dolozit nemuze. Zapsal jsem to do architektura-navrh.md par. 6 vcetne toho, co ma clovek udelat misto hledani obchvatu: kdo potrebuje, aby do okna psala integrace, NEDAVA na to okno krok navic a resi to ACL. Kdyby to slo obejit tokenem, prestal by krok navic znamenat to, co znamena."
     }
   ],
   "decisions": [
@@ -614,7 +615,7 @@
       "id": "D-15",
       "topic": "vynucovani",
       "decision": "Brana plochy a ACL okna se kontroluji ZVLAST. Runtime nesmi nahradit dve kontroly jednim dotazem na efektivni ACL okna.",
-      "why": "Dedicnost slouc\u00ed jen prava jednoho objektu, ne dve urovne. Viz F-09 s konkretnim rozlozenim prav, na kterem to selze.",
+      "why": "Dedicnost sloucí jen prava jednoho objektu, ne dve urovne. Viz F-09 s konkretnim rozlozenim prav, na kterem to selze.",
       "docs": "architektura-navrh.md par. 5",
       "refs": [
         "F-09",
@@ -633,6 +634,52 @@
         "D-03"
       ],
       "implemented_in": null
+    },
+    {
+      "id": "D-17",
+      "topic": "Needs.INSTANCE",
+      "decision": "INSTANCE se vyhodnocuje proti ACL instance (adresa 'instance:', sloveso zasahovat), vychozi zavreno. Instance je objekt jako kazdy jiny - tataz funkce resolve(address, verb), zadna zvlastni cesta. V tabulce plati: pomlcka znamena 'netyka se', nikdy 'nekontroluje se'.",
+      "why": "Jak byla tabulka napsana, INSTANCE nekontrolovala nic - NONE pod jinym jmenem, tedy chyba 3.2. Nalez F-11.",
+      "docs": "architektura-navrh.md par. 5",
+      "refs": [
+        "F-11",
+        "D-06"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-18",
+      "topic": "krok navic a programovy vstup",
+      "decision": "Volajici bez relace nikdy nesplni krok navic a zadny token to neobchazi. Kdo potrebuje, aby do okna psala integrace, nedava na to okno krok navic a resi to ACL.",
+      "why": "Krok navic se pta 'jsi to fakt ty, ted'; stroj to dolozit nemuze. Obchvat tokenem by zrusil vyznam kroku navic. Nalez F-12.",
+      "docs": "architektura-navrh.md par. 6",
+      "refs": [
+        "F-12",
+        "D-10"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-19",
+      "topic": "gramatika verejneho API",
+      "decision": "Zapis je 'kde . objekt . co': instance.screen.open(...) / .get(...), screen.window.open(kind, id=..., title=...) / .get(...) / .close(...) / .all(). Typ okna je HODNOTA prvniho argumentu, ne jmeno metody. Jednotne cislo (window, ne windows); prochazeni je vyslovne .all().",
+      "why": "Rozhodl vlastnik projektu s pozadavkem 'co nejcitelnejsi zapis'. Vecny duvod pro kind jako hodnotu: pri open_panel() by jadro muselo znat seznam typu a publikovany typ treti strany by vlastni metodu nikdy nedostal - vestavene by mely privilegovanou cestu (typy-oken.md par. 3). Muj drivejsi navrh open_panel byl v tomhle spatny.",
+      "docs": "architektura-navrh.md par. 2 a 12.5, okno-kontrakt.md par. 1",
+      "refs": [
+        "D-13"
+      ],
+      "implemented_in": null
+    },
+    {
+      "id": "D-20",
+      "topic": "vynucovani",
+      "decision": "needs=WRITE musi projit ACL okna pro OBE slovesa (videt i zasahovat). Zasahovat implikuje videt.",
+      "why": "Tvoje implementace to uz dela a je to spravne - okno, ktere relace nevidi, se ji nikdy nedorucilo, takze zapis do nej muze prijit jen z podvrzeneho klienta. Nebylo to nikde napsane, ted je.",
+      "docs": "architektura-navrh.md par. 5",
+      "refs": [
+        "F-09"
+      ],
+      "implemented_in": "runtime/events.py Guard._check_object"
     }
   ],
   "backlog": [
@@ -740,6 +787,36 @@
     "B-09: test verejneho API, az bude vb.Instance existovat."
   ],
   "history": [
+    {
+      "by": "programmer",
+      "turn": 5,
+      "at": "2026-08-19T12:30:21+02:00",
+      "summary": "Runtime vrstva: registr objektu a JEDINE vynucovaci misto. 153 testu zelenych. B-06 a B-10 hotove, F-09 ma vlastni test s presne tim rozlozenim prav, ktere jsi popsal. Mam jeden novy nalez, ktery povazuju za dulezity: Needs.INSTANCE tak, jak je v par. 5 napsany, nekontroluje NIC - je to Needs.NONE pod jinym jmenem.",
+      "done": [
+        "runtime/registry.py - ObjectRegistry: jeden registr podle adresy, resolve(address, verb) s dedicnosti, step_up_at(); 16 testu",
+        "runtime/sessions.py - Grants: krok navic patri DVOJICI (relace, objekt), revoke_session/revoke_object; pokryto v testech udalosti",
+        "runtime/events.py - Needs/StepUp/Verdict/Decision/Registration/EventRegistry/Guard; 31 testu",
+        "B-06 hotovo: kazda udalost ma needs (povinny kwarg), zadna hodnota nevypina kontrolu (testuje se SEZNAM hodnot enumu), nikdo krome window_unlock nema step_up=EXEMPT",
+        "B-10 hotovo: test s okno see=[users] na plose write=[administrator] - uzivatel konci na SCREEN_CLOSED",
+        "D-06 a D-15 maji implemented_in"
+      ],
+      "tested": [
+        "153 testu zelenych (core 102 + runtime 51). Cely runtime bezi bez serveru.",
+        "SABOTAZ vynucovaciho mista: vypnul jsem branu plochy v Guard._check_object (presne chyba 3.2 z viewBase2). Padlo 5 testu vcetne test_anonymous_on_a_hidden_screen_reaches_no_handler_at_all a testu na F-09. Po vraceni 153 passed. Invariant nad registrem tim ma dolozéno, ze diru opravdu chyta.",
+        "Pridal jsem k invariantu jeste kontrolu sebe sama (test_the_invariant_test_would_notice_a_hole): na verejne plose musi nektera udalost PROJIT. Bez toho by invariant prochazel i nad vynucovanim, ktere odmita vsechno.",
+        "Jeden muj test byl spatne a opravil jsem TEST, ne kod: 'volajici bez relace nema krok navic' jsem napsal s anonymem, ktery ale skonci uz na brane plochy. Prepsal jsem ho na volajiciho, ktery ACL PROJDE (REST s principaly) a relaci nema - ted konci na NO_GRANT, jak ma."
+      ],
+      "unclear": [
+        "F-11 je jediny, kde nechci rozhodnout sam - Needs.INSTANCE nema v par. 5 co kontrolovat. Implementoval jsem to jako vlastni ACL instance (Guard.instance_access, vychozi zavreno), ale je to muj vyklad, ne tvoje rozhodnuti.",
+        "B-09 (test verejneho API) jsem NEDELAL zamerne: D-13 uvadi v dokumentovanem seznamu vb.Instance, a ta jeste neexistuje. Castecny export ted by znamenal cerveny test do priste. Udelam to v jednom kuse, az bude Instance."
+      ],
+      "needs_verification": [
+        "K tvemu pozadavku na B-10: test se jmenuje test_user_cannot_write_into_a_window_on_a_screen_reserved_for_the_administrator a ma v sobe i overeni predpokladu pasti - assert, ze efektivni ACL okna pro zapis uzivatele OPRAVDU pousti. Bez toho by test prochazel i kdyby dedicnost fungovala jinak, nez popisujes, a nic by nedokazoval.",
+        "K B-06: 'zadna hodnota nevypina kontrolu' netestuju chovanim, ale porovnanim SEZNAMU hodnot enumu ({INSTANCE, SCREEN, SEE, WRITE}). Kdyby nekdo pristi rok pridal NONE, spadne to hned pri registraci noveho jmena - ne az kdyz ho nekdo pouzije.",
+        "Fasadu window.access (D-14) jsem jeste nepsal - potrebuje Window, ktere zatim neexistuje. Radek z par. 4a pujde do testu doslova, az bude."
+      ],
+      "blocked": "Ne. Dalsi na rade je Instance a Screen/Window, s nimi fasada window.access (D-14, B-08) a test verejneho API (B-09)."
+    },
     {
       "by": "konzultant",
       "turn": 4,

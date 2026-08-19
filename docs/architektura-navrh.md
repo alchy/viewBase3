@@ -61,9 +61,33 @@ známého stavu.
 
 ```python
 instance = vb.Instance(policy=…, identity=…, log=…, sessions=…)
-screen = instance.screen(title="Provoz", id="provoz")
-window = screen.html("mzdy", title="Mzdy")
+screen = instance.screen.open(title="Provoz", id="provoz")
+window = screen.window.open("panel", id="mzdy", title="Mzdy")
 ```
+
+**Gramatika API je `kde . objekt . co`** a drží se na každé úrovni:
+
+```python
+instance.screen.open(title=…, id=…)      instance.screen.get("provoz")
+screen.window.open("panel", id=…)        screen.window.get("mzdy")
+screen.window.close("mzdy")              screen.window.all()
+```
+
+Dvě věci, které z toho plynou a jsou důležitější než vzhled:
+
+- **Typ okna je hodnota, ne jméno metody.** `screen.window.open("panel", …)`
+  znamená, že jádro seznam typů **nezná** — jen ho podá registru. Kdyby
+  existovalo `open_panel()`, musel by každý nový typ přidat metodu na
+  `Screen` a publikovaný typ třetí strany by vlastní metodu nikdy nedostal:
+  vestavěné typy by měly privilegovanou cestu (viz `typy-oken.md` §3).
+  Neznámý `kind` selže **hned při volání**, se seznamem registrovaných typů.
+- **Jmenný prostor je objekt, ne sloveso.** `screen.open.window(…)` by
+  znamenalo `open` s jediným členem a pak `close`, `find`, `list` jako další
+  prostory po jednom. Takhle roste jeden prostor o slovesa.
+
+Jednotné číslo (`window`, ne `windows`) má jeden důsledek: procházení se
+nedá napsat jako `for w in screen.window`, proto je na to výslovné
+`screen.window.all()`.
 
 Objekt si drží odkaz na instanci, ne na modul. Testy pak nepotřebují nic
 resetovat — vyrobí si vlastní instanci.
@@ -71,7 +95,7 @@ resetovat — vyrobí si vlastní instanci.
 **Adresa vzniká při narození.** Ve viewBase2 okno vzniká bezejmenné
 (`HtmlWindow("mzdy")`) a adresu dostane, teprve když ho plocha přijme; do
 té doby má práva „nikam nepatřící" objekt. Když se okno vyrábí přes
-`screen.html(...)`, tenhle mezistav neexistuje.
+`screen.window.open(...)`, tenhle mezistav neexistuje.
 
 **Id je neprůhledné, pořadí je něco jiného.** viewBase2 měl procesní čítač
 `1, 2, 3…`, který plnil dvě role zároveň — pořadí na liště a adresu. Jako
@@ -216,12 +240,28 @@ register("menu_select",   handler, needs=Needs.SCREEN)
 
 Enum je **úplný** a nemá hodnotu, která by kontrolu vypínala:
 
-| `needs` | brána plochy | okno vidět | okno zasahovat |
+| `needs` | co se kontroluje | okno vidět | okno zasahovat |
 |---|---|---|---|
-| `INSTANCE` | – (událost se netýká plochy: správa instance) | – | – |
-| `SCREEN` | zasahovat | – | – |
-| `SEE` | vidět | ano | – |
-| `WRITE` | zasahovat | ano | ano |
+| `INSTANCE` | **ACL instance** (`instance:`, sloveso *zasahovat*) | – | – |
+| `SCREEN` | ACL plochy, *zasahovat* | – | – |
+| `SEE` | ACL plochy, *vidět* | ano | – |
+| `WRITE` | ACL plochy, *zasahovat* | ano | ano |
+
+**Pomlčka znamená „netýká se", nikdy „nekontroluje se".** Každá hodnota má
+proti čemu se vyhodnotit — kdyby některá neměla, je to `NONE` pod jiným
+jménem, tedy přesně ta hodnota, kterou jsme z enumu vyhodili. (Přesně tahle
+past v téhle tabulce byla: `INSTANCE` tu měla pomlčky ve všech sloupcích,
+takže jak bylo napsané, nekontrolovala nic — nález F-11.)
+
+**Instance je objekt jako každý jiný.** Má adresu `instance:` a vlastní ACL,
+takže se `INSTANCE` vyhodnocuje **toutéž** funkcí `resolve(address, verb)`
+jako všechno ostatní — žádná zvláštní cesta. Výchozí hodnota je **zavřeno**:
+projde jen správce (přes výjimku v `allowed`). Správa instance — zakládání
+ploch, administrativní akce — se tak nedá zavolat anonymně přes REST.
+
+**Zasahovat implikuje vidět.** Událost s `needs=WRITE` musí projít ACL okna
+pro *obě* slovesa. Není to jen opatrnost: okno, které relace nevidí, se jí
+nikdy nedoručilo, takže zápis do něj může přijít jen z podvrženého klienta.
 
 **Obě úrovně se kontrolují zvlášť, dědičnost je nesloučí.** Dědičnost
 odpovídá na otázku „jaké ACL platí pro *tenhle* objekt"; brána plochy je
@@ -261,6 +301,14 @@ vstup s tokenem    → principals z konfigurace instance
 Návrhově: **jeden typ „volající" (`Caller`) pro relaci prohlížeče i pro
 programový vstup.** Rozdíl je jen v tom, odkud se jeho principálové vzali.
 Vynucovací kód pak nemá dvě větve.
+
+**Programový vstup se nikdy nedostane k oknu s krokem navíc.** Krok navíc
+patří dvojici *(relace, objekt)* a volající bez relace žádnou nemá — žádný
+token to neobejde. Je to správně (kód z autentikátoru se ptá „jsi to fakt
+ty, teď", a to stroj doložit nemůže), ale je to provozní důsledek, na který
+se naráží pozdě: kdo potřebuje, aby do okna psala integrace, **nedává na to
+okno krok navíc** a řeší to ACL (`rest_access`). Kdyby to šlo obejít
+tokenem, přestal by krok navíc znamenat to, co znamená.
 
 ## 7. Log a audit
 
@@ -436,7 +484,8 @@ Otázky, na které viewBase2 odpovídal postupně a stálo to přepisování:
    ```
 
    Všechno ostatní se získává **z instance**, ne importem: plochy z
-   `instance.screen(...)`, okna z `screen.panel(...)`, obsah metodami okna.
+   `instance.screen.open(...)`, okna z `screen.window.open(...)`, obsah
+   metodami okna.
    Vývojář nikdy neimportuje `viewbase.core.*` — to je vnitřek.
 
    Vynucuje to `__all__` **a test**, který porovná veřejná jména modulu
