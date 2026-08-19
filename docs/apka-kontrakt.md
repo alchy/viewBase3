@@ -8,6 +8,18 @@ v jiném procesu. Zadání pro `AppBackend`.*
 
 ---
 
+## 0. Co je na tomhle dokumentu závazné
+
+**Závazný je [appkit](appkit.md), ne tvar zpráv.** Tenhle dokument popisuje,
+co apka musí umět a proč — tvary zpráv v něm jsou **internals**, které se
+mění s verzí knihovny. Autor apky je nečte a nepotřebuje: implementuje
+`Content`, deklaruje u operací sloveso a zbytek dělá appkit.
+
+Důvod je v [appkit.md](appkit.md) §5: tenhle protokol mluví jenom viewBase
+se svými apkami, takže volný drát by kupoval jedinou svobodu — napsat si
+klienta ručně — a přesně z ní vzejde jinak spočítaný kurzor a znovu
+vymyšlená autorizace.
+
 ## 1. Dva kanály, které se nesmí slévat
 
 ```
@@ -315,25 +327,40 @@ požadavek: apka si vlastní schéma ověřování nevymýšlí.
 ```
 volající ──► token ──► apka
                         │
-                        └─► POST /auth/introspect { token, audience }
-                            ← { subject_id, groups, expires_at }   nebo 401
+                        └─► POST /auth/introspect { token, resource }
+                            ← { subject_id, capabilities, expires_at }  nebo 401
 ```
 
 | kdo volá | co předloží | co apka zjistí |
 |---|---|---|
-| instance (okno se otevírá) | token subjektu, `audience: app:workbench.graph` | `user:jindra` |
-| dávková úloha, cron | token vydaný správcem pro subjekt | `user:jindra` nebo `service:nightly-import` |
+| instance (okno se otevírá) | token subjektu s `audience: app:workbench.graph` | `user:jindra` **a jeho `capabilities` k tomu obsahu** |
+| dávková úloha, cron | token vydaný správcem pro subjekt | `user:jindra` nebo `service:nightly-import`, **a `capabilities`** |
 
 **Rukojeť v tokenu není.** Token říká *kdo*, požadavek říká *co*
 (`/content/vb1_9f2c…/nodes`). Tím zůstává v platnosti věta „rukojeť
 identifikuje, neopravňuje" — a zároveň je z každého volání jednoznačné
 **obojí**: která instance obsahu a který člověk.
 
-### `audience` je povinná
+### Dvě různá pole, dvě různé otázky
 
-Token vydaný pro `app:workbench.graph` **nesmí projít** u jiné apky. Bez
-toho by kompromitovaná apka mohla přehrát tokeny svých diváků kamkoli
-jinam. Apka `audience` ověřuje, ne jen čte.
+Dřív se obojímu říkalo `audience` a splývalo to. Jsou to dvě věci:
+
+| pole | kde je | co říká |
+|---|---|---|
+| `audience` | **v tokenu** | která apka ho smí přijmout — `app:workbench.graph` |
+| `resource` | **v dotazu na introspekci** | na co se ptáme — `content:vb1_9f2c…` |
+
+`audience` v tokenu je povinná: token vydaný pro jednu apku **nesmí projít**
+u jiné, jinak by kompromitovaná apka přehrála tokeny svých diváků kamkoli
+jinam. Apka ji ověřuje, ne jen čte.
+
+`resource` je to, co dělá odpověď použitelnou. **Apka nemá ACL** (D-60),
+takže z `app:<id>` se nedá spočítat vůbec nic — práva jsou na obsahu. Bez
+`resource` by introspekce vrátila jen „tenhle člověk existuje" a apka by si
+zbytek musela dopočítat sama. To je F-23 znovu, jen o jeden kanál vedle.
+
+Token tím pořád říká **jen kdo** — rukojeť v něm není. Úzká je až ta
+otázka.
 
 ### Ověřuje se dotazem, ne podpisem
 
@@ -351,46 +378,38 @@ podepsaný token nabízel, bez ceny v podobě nezrušitelnosti.
 - **autor apky nevymýšlí autentizaci**, což je místo, kde se to obvykle
   pokazí.
 
-### Skupiny se sdílejí — a je hranice, kde se smí použít
+### Skupiny se apce neposílají
 
-Introspekce vrací i `groups`, protože bez nich by apka uměla psát jen
-pravidla na jméno („hana smí"), a to se nedá udržet.
+Introspekce vrací `capabilities`, ne `groups`. Apka se nedozví, kde je ten
+člověk v organizaci, protože to k práci nepotřebuje.
 
-| kde | smí se použít |
-|---|---|
-| **vlastní pravidla apky nad jejím obsahem** („účetní smí zapisovat") | **ano** — na to tam jsou |
-| **rozhodnutí, co vrátit v `snapshot`** | **ne** — to jsme už autorizovali my |
+Dřív tu stálo, že apka smí psát vlastní pravidla nad skupinami („účetní smí
+zapisovat"). Odůvodňovalo se to řádkovými právy — každý vidí jen řádky svého
+střediska. **Ta potřeba neexistuje: jednotkou přístupu je obsah**, ne řádek
+a ne buňka. Kdo chce, aby dvě skupiny lidí viděly jiná čísla, udělá **dva
+dokumenty** s vlastními ACL — přesně jako `Mzdy.xls` a `Rizika.xls`
+v dodatku architektury. Je to o patro výš, kde na to model existuje.
 
-Rozdíl proti poli `capabilities` v `subject`: `capabilities` říká, **co ten
-divák smí v tomhle okně** (naše rozhodnutí, `read`/`write`); `groups` jsou
-**vstup pro doménová pravidla apky**. Odpovídají na jiné otázky a nemají se
-zaměňovat.
+Co tím odpadlo:
 
-**Skupiny se tím stávají sdíleným slovníkem.** Když se `group:ucetni`
-v adresáři přejmenuje, tiše přestanou platit pravidla ve všech apkách, které
-na něm stojí. Přejmenování skupiny je proto **rušící změna napříč systémem**,
-ne kosmetika v konfiguraci.
-
-**Minimum, které stačí:** apka při registraci deklaruje, které skupiny ji
-zajímají, a introspekce vrací **jen členství mezi nimi**:
-
-```json
-"groups_of_interest": ["group:ucetni", "group:mzdy"]
-```
-
-Bez toho se každá apka, kterou si člověk otevře, dozví celou jeho pozici
-v organizaci — a u apek třetích stran je to únik struktury firmy, který
-s jejich funkcí nemá nic společného.
+- `groups_of_interest` v manifestu,
+- poslední místo, kde si apka mohla postavit **druhý autorizační model**
+  (F-23 ukázal, jak to dopadá),
+- a hlavně: **skupiny přestávají být sdílený slovník napříč apkami.**
+  Přejmenování `group:ucetni` v adresáři už není rušící změna napříč
+  systémem — je to změna uvnitř instance a ven z ní nesahá.
 
 ### Autentizace ano, autorizace ne
 
-Sdílí se **„kdo je kdo"**. **„Co kdo smí se svým obsahem" zůstává apce** —
-vlastnictví obsahu jsou její data. Kdyby si apka vyhodnocovala i naše ACL,
-slijí se dvě osy zpátky do jedné a vzniknou dvě odpovědi na jednu otázku.
+Apka **neautorizuje vůbec**. Ani na prezentačním kanálu (tam rozhodla
+instance dřív, než apku zavolala), ani na klientském (tam si o rozhodnutí
+řekne introspekcí). Jediné, co s právy dělá, je **porovnání deklarovaného
+slovesa s tím, co přišlo v `capabilities`** — a to za ni obstará appkit.
 
-A opačně: apka si v `snapshot` **znovu neověřuje**, jestli divák na obsah má.
-Když ji instance zavolala, už autorizovala; druhá kontrola jiným modelem by
-dřív nebo později dala jinou odpověď.
+Vlastnictví obsahu jí zůstává jako **údaj**, ne jako právo: čísluje se podle
+něj „Graph #1" a spouštěč podle něj umí oddělit moje od sdílených. Když
+z něj apka udělá autorizační vstup, dostane jinou odpověď než instance —
+přesně to byl F-23.
 
 ### Cena, kterou to má
 
