@@ -19,8 +19,24 @@ nic nemá.
 
 | pojem | co to je | kdo to dodává |
 |---|---|---|
-| **`kind`** | *jak se to vykreslí* — renderer v prohlížeči | typ okna (vestavěný nebo publikovaný) |
-| **`app_id`** | *odkud je obsah* — model, stav, business logika | apka (in-process nebo kontejner) |
+| **`kind`** | *jak se to vykreslí* — renderer | **vždy workbench**, z kurátorovaného katalogu |
+| **`app_id`** | *odkud je obsah* — model, stav, doménová logika | apka (in-process nebo kontejner) |
+
+**APKA NEDODÁVÁ JAVASCRIPT. NIKDY.** Renderery jsou výhradně naše a jsou to
+přesně ty typy oken, které máme (`panel`, `doc`, `console`, `shell`, `log`,
+`graph`). Apka posílá **data v tvaru, který renderer umí**, a nic víc.
+
+Je to nejdůležitější rozhodnutí celého návrhu, protože zavírá díru, kterou
+nešlo zavřít jinak. Byly tři možnosti:
+
+| varianta | cena |
+|---|---|
+| **věřit** cizímu rendereru | přečte session id, DOM cizích oken, síť — nevynutitelné |
+| **izolovat** ho (iframe + CSP) | vlastní GL kontext, kopírování každé zprávy — u grafu nepoužitelné |
+| **nemít žádný cizí** | katalog je strop |
+
+První dvě se platí pořád, třetí jednou při návrhu. **Izolace kurátorovaným
+rendererem je jediná varianta, která dá záruku a nestojí výkon.**
 
 Jsou to **dvě nezávislé osy** (stejně jako „kdo je kdo" a „co smí naše
 objekty" v přístupovém modelu). Vztah je N:1 — mnoho apek sdílí jeden
@@ -155,15 +171,45 @@ Rozdíl je podstatný: první případ je chyba autora a má se ozvat okamžitě
 druhý je provozní stav a nesmí zastavit workbench. Bez toho rozlišení jedna
 mrtvá apka zdrží celou instanci — a přesně to v původním konceptu chybělo.
 
-## 3. Vestavěné typy: stejná pravidla, jiná cena
+## 3. Kurátorovaný neznamená zadrátovaný
 
-**Vestavěný typ používá tentýž veřejný kontrakt jako publikovaný.** Rozdíl
-je jen v tom, že se u něj neplatí za izolaci (`trust: core`, jeden bundle,
-žádný iframe) — ne v tom, co umí.
+Katalog rendererů je uzavřený vůči *běhu*, ne vůči vývoji. Kdyby renderery
+byly rozseté po jádře, porušili bychom vlastní anti-pattern *„nový `kind`
+nesmí vyžadovat editaci jádra"*.
 
-Je to tvrdé pravidlo, ne estetika: ve viewBase2 bylo log okno speciální
-případ mimo běžnou cestu a přesně tam vznikl únik auditní stopy. Co má
-privilegovanou zkratku, to se přestane testovat jako všechno ostatní.
+Proto: **renderer zůstává samostatný balík** (`manifest`, `schema`,
+`client/`, `tests/`) a přidává se **při buildu**. Rozdíl proti dřívějšku je
+jediný — nepřichází od cizího za běhu.
+
+| | dřív | teď |
+|---|---|---|
+| odkud renderer je | od apky, za běhu | z katalogu, při buildu |
+| kdo ho schválil | nikdo | review a build |
+| izolace | sandbox, nebo důvěra | není potřeba — je náš |
+| cena | výkon, nebo riziko | katalog je strop |
+
+**Poctivá cena:** kdo chce vizualizaci, kterou žádný renderer neumí, musí ji
+přispět do katalogu. Je to pomalejší než přiložit si vlastní `ui.js` — a
+přesně o tu rychlost jde: získal by ji i útočník.
+
+## 3b. Vrstva mezi apkou a rendererem
+
+Z toho plyne, co musí vzniknout: **každý renderer publikuje svoje datové
+API.** Apka produkuje data v tom tvaru, renderer je konzumuje, ani jeden
+o tom druhém neví nic víc.
+
+```
+renderer graph  →  kontrakt graph.v1
+  snapshot   { nodes[], edges[], node_types{}, flows[], config{} }
+  delty      add_node / remove_node / update_node / add_edge / …
+  události   node_click(request) · node_hover(local) · view_change(local)
+  volby      physics · dimensions 2D/3D · splines · highlight   ← lokální
+  potřebuje  webgl (volitelně; jinak 2D ústup)
+```
+
+Příjemný důsledek: **stejná data může umět zobrazit víc rendererů.** Kdo
+pošle `graph.v1`, dívá se grafem; až někdo napíše `table`, který `graph.v1`
+taky přijme, je z toho „Zobrazit jako tabulku" bez zásahu do apky.
 
 ## 4. Sada typů pro v3
 

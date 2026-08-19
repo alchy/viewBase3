@@ -81,7 +81,7 @@ Nahrazuje dřívější `content: shared | per-session | instance` a zobecňuje 
 | `window` | plocha + okno | dashboard vázaný na to okno |
 | `session` | okno + relace | **shell** — dva taby, dva terminály |
 | `user` | okno + uživatel | **osobní graf** — dva taby, jeden obsah |
-| `instance` | instance | **log** — jeden proud pro celou instanci |
+| `instance` | instance **+ app_id** | **log** — jeden proud na apku; dvě apky si nesmí sdílet rukojeť |
 | `app` | nic (jedna rukojeť) | společná mapa sítě pro všechny |
 | `explicit` | nic; `handle=` je povinný | dávkové plnění zvenčí |
 
@@ -255,29 +255,108 @@ odhlášení relace**. Apka nemá jak se dozvědět, že divák odešel.
 U `scope: user` platí totéž s koncem poslední relace toho člověka; u
 `explicit` neplatí nikdy.
 
-## 8. Klientský modul se připíná otiskem
+## 8. Apka nedodává JavaScript
 
-Modul servíruje apka, ale prohlížeč ho stahuje **přes workbench** (proxy —
-žádný cizí origin, žádné cizí cookies). Registrace nese **verzi a otisk**:
+**Renderery jsou výhradně naše, z kurátorovaného katalogu** (viz
+[typy-oken.md](typy-oken.md) §1). Apka posílá data v tvaru, který renderer
+umí, a žádný kód do prohlížeče neposílá — takže odpadá připínání modulu
+otiskem, stupně důvěry i sandbox.
 
-```json
-"client_module": { "url": "/ui.js", "version": "1.4.0", "sha256": "9f2c…" }
+Kdo potřebuje vizualizaci, kterou žádný renderer neumí, **přispěje renderer
+do katalogu** (build-time, review), ne modul k apce.
+
+## 9. Jedno povinné autentizační API pro oba kanály
+
+Apka má dvě dveře — instance přes prezentační kanál a kdokoli přes klientské
+REST — a **do obojích se chodí stejným způsobem**. Není to nabídka, je to
+požadavek: apka si vlastní schéma ověřování nevymýšlí.
+
+```
+volající ──► token ──► apka
+                        │
+                        └─► POST /auth/introspect { token, audience }
+                            ← { subject_id, groups, expires_at }   nebo 401
 ```
 
-- workbench modul stáhne, ověří otisk a **cachuje**,
-- **stejná verze s jiným otiskem = odmítnout a zalogovat**,
-- nová verze = nový záznam, ne tichá záměna.
+| kdo volá | co předloží | co apka zjistí |
+|---|---|---|
+| instance (okno se otevírá) | token subjektu, `audience: app:workbench.graph` | `user:jindra` |
+| dávková úloha, cron | token vydaný správcem pro subjekt | `user:jindra` nebo `service:nightly-import` |
 
-Bez toho je „nasadím novou verzi kontejneru" totéž co „spustím všem divákům
-jiný kód, než jaký kdokoli schválil" — a stane se to uprostřed jejich relace.
-Je to nejtišší způsob, jak si do prohlížečů pustit cizí JS.
+**Rukojeť v tokenu není.** Token říká *kdo*, požadavek říká *co*
+(`/content/vb1_9f2c…/nodes`). Tím zůstává v platnosti věta „rukojeť
+identifikuje, neopravňuje" — a zároveň je z každého volání jednoznačné
+**obojí**: která instance obsahu a který člověk.
 
-## 9. Kanál je autentizovaný oboustranně
+### `audience` je povinná
 
-Apka musí vědět, že se ptá **skutečná** instance. Kdyby ne, kdokoli v té síti
-si vyžádá snapshot s podvrženým `subject` — a celý `SubjectContext` přestane
-cokoli znamenat. Sdílené tajemství nebo mTLS; patří to do specifikace, ne
-mezi „provozní detaily".
+Token vydaný pro `app:workbench.graph` **nesmí projít** u jiné apky. Bez
+toho by kompromitovaná apka mohla přehrát tokeny svých diváků kamkoli
+jinam. Apka `audience` ověřuje, ne jen čte.
+
+### Ověřuje se dotazem, ne podpisem
+
+Introspekce místo podepsaného tokenu, ze stejného důvodu jako u relací:
+**pravdu drží tabulka, takže odvolání je okamžité.** Apka si smí odpověď
+krátce cachovat (řádově desítky sekund) — to je celá úleva, kterou
+podepsaný token nabízel, bez ceny v podobě nezrušitelnosti.
+
+### Co to vyřeší
+
+- **klíč k apce přestane být mocný jako všechna její data** — místo jednoho
+  sdíleného hesla je z každého volání vidět konkrétní subjekt,
+- **dávková úloha běží *jako někdo*** — `user:jindra` v okně i v cronu je
+  týž subjekt a v auditu se to spojí,
+- **autor apky nevymýšlí autentizaci**, což je místo, kde se to obvykle
+  pokazí.
+
+### Skupiny se sdílejí — a je hranice, kde se smí použít
+
+Introspekce vrací i `groups`, protože bez nich by apka uměla psát jen
+pravidla na jméno („hana smí"), a to se nedá udržet.
+
+| kde | smí se použít |
+|---|---|
+| **vlastní pravidla apky nad jejím obsahem** („účetní smí zapisovat") | **ano** — na to tam jsou |
+| **rozhodnutí, co vrátit v `snapshot`** | **ne** — to jsme už autorizovali my |
+
+Rozdíl proti poli `capabilities` v `subject`: `capabilities` říká, **co ten
+divák smí v tomhle okně** (naše rozhodnutí, `read`/`write`); `groups` jsou
+**vstup pro doménová pravidla apky**. Odpovídají na jiné otázky a nemají se
+zaměňovat.
+
+**Skupiny se tím stávají sdíleným slovníkem.** Když se `group:ucetni`
+v adresáři přejmenuje, tiše přestanou platit pravidla ve všech apkách, které
+na něm stojí. Přejmenování skupiny je proto **rušící změna napříč systémem**,
+ne kosmetika v konfiguraci.
+
+**Minimum, které stačí:** apka při registraci deklaruje, které skupiny ji
+zajímají, a introspekce vrací **jen členství mezi nimi**:
+
+```json
+"groups_of_interest": ["group:ucetni", "group:mzdy"]
+```
+
+Bez toho se každá apka, kterou si člověk otevře, dozví celou jeho pozici
+v organizaci — a u apek třetích stran je to únik struktury firmy, který
+s jejich funkcí nemá nic společného.
+
+### Autentizace ano, autorizace ne
+
+Sdílí se **„kdo je kdo"**. **„Co kdo smí se svým obsahem" zůstává apce** —
+vlastnictví obsahu jsou její data. Kdyby si apka vyhodnocovala i naše ACL,
+slijí se dvě osy zpátky do jedné a vzniknou dvě odpovědi na jednu otázku.
+
+A opačně: apka si v `snapshot` **znovu neověřuje**, jestli divák na obsah má.
+Když ji instance zavolala, už autorizovala; druhá kontrola jiným modelem by
+dřív nebo později dala jinou odpověď.
+
+### Cena, kterou to má
+
+Apka je tím **závislá na běžící autentizační komponentě**. Je to vědomý
+obchod: jednotná identita a okamžité odvolání za jeden bod, který musí
+běžet. Zmírňuje to krátká cache a to, že ta komponenta je malá a oddělená —
+ale je poctivé to napsat, ne to schovat.
 
 ## 10. Události apky jdou do téhož registru
 
