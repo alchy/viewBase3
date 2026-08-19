@@ -1,0 +1,52 @@
+# --- co se nikdy nesmí dostat do gitu -------------------------------------
+# Logy: audit shellu obsahuje i to, co kdo napsal do terminálu (tedy i heslo
+# napsané na výzvu `sudo`).
+*.log
+logs/
+
+# Stav instance. Normálně leží v ~/.viewbase, ale cesta se dá nasměrovat
+# kamkoli – včetně klonu, typicky u kontejnerů a testů.
+.viewbase/
+users.json
+onetime-*.txt
+totp-*.svg
+totp-*.txt
+
+# Certifikáty a klíče (self-signed i vlastní).
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Konfigurace prostředí – bývá v ní, co má zůstat doma.
+.env
+.env.*
+!.env.example
+
+# --- předávací protokol ---------------------------------------------------
+# Samotný `.statefile` do gitu PATŘÍ (rozhodnutí D-12) – je to stopa
+# rozhodování stejně jako docs/. Rozepsaný meziprodukt atomického zápisu ale ne.
+.statefile.tmp
+
+# --- build a nástroje -----------------------------------------------------
+**/__pycache__
+*.py[cod]
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+.venv
+venv/
+node_modules/
+
+# --- editory a OS ---------------------------------------------------------
+.claude
+.idea/
+.vscode/
+.DS_Store

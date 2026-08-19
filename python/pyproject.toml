@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "viewbase"
+version = "3.0.0.dev0"
+description = "Plochy a okna v prohlizeci jako knihovna: Instance, Screen, Window."
+requires-python = ">=3.12"
+license = { file = "../LICENSE" }
+authors = [{ name = "Jindrich Nemec" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["viewbase"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"

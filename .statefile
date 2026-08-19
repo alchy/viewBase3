@@ -1,9 +1,9 @@
 {
   "statefile_version": 1,
   "project": "viewBase3",
-  "updated_at": "2026-08-19T12:10:00+02:00",
-  "move": "programmer",
-  "turn": 2,
+  "updated_at": "2026-08-19T12:17:17+02:00",
+  "move": "konzultant",
+  "turn": 3,
   "working_with_statefile": {
     "co_to_je": "Jediny kanal mezi dvema agenty, kteri pracuji na viewBase3: 'programmer' (pise kod a testy) a 'konzultant' (pise navrhy a architekturu v docs/). Soubor je stridave vlastneny - vzdy pise jen ten, kdo je na tahu. Neni to log ani chat, je to PREDAVACI PROTOKOL: kdo konci tah, musi po sobe nechat stav tak, aby druhy mohl zacit bez doptavani.",
     "kdo_je_na_tahu": "Klic 'move'. Hodnota 'programmer' = na tahu je programator. Hodnota 'konzultant' = na tahu je konzultant. Kdo neni na tahu, soubor POUZE CTE a nesmi do nej zapsat ani carku.",
@@ -48,8 +48,8 @@
   },
   "repo_state": {
     "commits": 2,
-    "last_commit": "19c8ad4 docs: navrhove poznamky k architekture viewBase3",
-    "kod": "zadny",
+    "last_commit": "94d2724 docs: odpovedi na 14 otazek, 12 rozhodnuti, oprava peti nalezu",
+    "kod": "python/viewbase/core/ (addressing, identity, access, audience) + python/tests/ - 102 testu zelenych. NEZACOMMITOVANO, ceka na rozhodnuti vlastnika.",
     "docs": [
       "docs/architektura-navrh.md",
       "docs/okno-kontrakt.md",
@@ -63,34 +63,35 @@
     "zdroj_reseni": "../viewBase2 (7429 radku python/viewbase, ~60 testovych souboru, frontend vanilla JS + Vite, FastAPI/uvicorn, Python 3.14)"
   },
   "last_turn": {
-    "by": "konzultant",
-    "turn": 2,
-    "at": "2026-08-19T12:10:00+02:00",
-    "summary": "Odpovedel jsem na vsech 14 otazek, dal verdikt peti nalezum a zapsal 12 rozhodnuti. Tri z peti nalezu byly skutecne chyby v mych dokumentech - opravil jsem je primo v docs/, aby nezustal rozpor mezi rozhodnutim a textem. Ctyri otazky (procesni model, frontend, distribuce, licence) rozhodl vlastnik projektu.",
+    "by": "programmer",
+    "turn": 3,
+    "at": "2026-08-19T12:17:17+02:00",
+    "summary": "Napsana cela vrstva core/ podle D-01 az D-12, test-first. 102 testu zelenych, kod je zatim jen core - zadny runtime, transport ani typy. Vsechny tri veci, ktere sis chtel overit u Audience, jsou pokryte testem. Narazil jsem na tri nove drobnosti v dokumentech (F-06 az F-08), z toho jedna je tvoje vlastni pravidlo par. 4c obracene proti dokumentu.",
     "done": [
-      "odpovezeno Q-01 az Q-14, status answered",
-      "verdikt F-01 az F-05; F-01, F-02, F-03, F-04, F-05 potvrzeny a opraveny v docs/",
-      "zapsano D-01 az D-12",
-      "docs/architektura-navrh.md: novy tvar Audience (pozdni vazba, bez zmrazenych principalu), uplny enum Needs + step_up jako druha osa, jedno rozvrzeni repa (surfaces/ zanika), odpovedi v par. 12 vcetne durazu 'porad je to knihovna'",
-      "docs/okno-kontrakt.md: ctx.state je klientska mezipamet (F-02), tabulka schopnost x stupen duvery (F-03)",
-      "docs/typy-oken.md: treti hodnota content:instance (F-04), rozvrzeni sladene s architekturou",
-      "docs/glosar.md zalozen (B-01)",
-      "LICENSE (Apache-2.0, drzitel Jindrich Nemec)",
-      "backlog: B-01 a B-02 hotovo, B-03 ready, pridano B-04 az B-07"
+      "scaffold: python/pyproject.toml (balicek viewbase, hatchling, pytest), .venv, python/tests/",
+      "core/addressing.py - Address jako hodnota (segmenty typ:id), parent, parse, new_id; 19 testu",
+      "core/identity.py - PUBLIC/USERS/ADMINISTRATOR, principal(), user_principals(), Caller, Origin; 25 testu",
+      "core/access.py - Acl (nemenna hodnota), Access (see/write/step_up), Verb, allowed(), effective_acl(); 27 testu",
+      "core/audience.py - Ref/Session/And, Message s povinnym publikem; 19 testu",
+      "tests/test_architecture.py - strojovy invariant nad rozvrzenim: smer zavislosti a 'core nevidi server'; 12 testu",
+      "B-03 hotovo (port access z vb2), D-01 az D-04, D-06, D-07, D-10, D-12 maji implemented_in"
     ],
     "tested": [
-      "platnost JSON tohoto souboru (python3 -m json.tool)",
-      "kontrola, ze odkazy mezi dokumenty v docs/ vedou na existujici soubory",
-      "kod porad zadny - to je tvoje cast"
+      "102 testu, vsechny zelene, cely core bezi BEZ serveru (par. 11 splneno strojove, ne nahodou)",
+      "TDD cyklus dodrzen u kazdeho modulu: test napsan prvni, spusten cerveny, pak teprve implementace",
+      "test_architecture.py jsem overil tim, ze jsem do core/access.py DOCASNE vlozil 'import asyncio' a 'from viewbase.runtime import registry' - test oba nalezy chytil (3 failed), po vraceni zase 12 passed. Test, ktery nad hotovym kodem jen projde, nedokazuje nic.",
+      "Address.screen() jsem musel prepsat: prvni verze mela kolizi jmen (pole 'screen' vs. tovarna 'screen') a resil jsem to prirazenim classmethod na tridu. Byl to signal spatneho navrhu, ne detail - uvnitr je ted posloupnost dvojic (typ, id) a tovarny jsou jediny zpusob, jak adresu vyrobit."
     ],
     "unclear": [
-      "Nic blokujiciho z me strany. Otevrene zustava jen to, co ma prijit s praci: tvar DTO na hranicich vrstev (rozhodneme az podle prvniho core/) a to, jestli 'panel' potrebuje vlastni schema per prvek, nebo jedno pro cely strom."
+      "F-06 je jediny, kde bych se nerad rozhodl sam: par. 4a dokumentuje zapis 'window.access.see.add(...)', ale par. 4b rika, ze Acl je nemenna hodnota a meni se pres instanci. Par. 4c pritom rika, ze co je v dokumentaci, patri doslova do testu. Ted ten zapis neexistuje - je to presne chyba 3.11 z viewBase2, jen o kolo driv.",
+      "Verejne API (par. 12.5) je jediny z peti bodu bez zeleneho hacku. Nechal jsem viewbase/__init__.py prazdny zamerne - jakmile napisu examples, budu potrebovat vedet, co z 'import viewbase as vb' ma cuchat ven."
     ],
     "needs_verification": [
-      "Az napises prvni verzi Audience: chci videt, ze resolve() je JEDINA vec, kterou vysilaci smycka o pravech vi.",
-      "Az napises registr udalosti: strojovy test ma vzniknout DRIV nez prvni udalost (B-06)."
+      "K tvemu pozadavku 'resolve() je JEDINA vec, kterou vysilaci smycka o pravech vi': splneno a je to v testech. Audience.allows(caller, resolve) je jediny vstup; Session se na resolve zamerne NEPTA a mam na to test, ktery resolveru podstrci funkci vyhazujici AssertionError. Zaroven test_no_audience_shape_can_carry_a_frozen_set_of_principals prochazi strojove vsechny tvary publika a hlida, ze zadny nema pole 'principals' ani 'acl' - takze pozdni vazba neni jen dodrzena, ona nejde obejit.",
+      "step_up allowed() ZAMERNE neresi - je to druha osa a vynucuje se v runtime. Az napisu registr udalosti, musi na to byt vlastni test; jinak by se stalo, ze administrator projde i krok navic (vb2 to ma spravne a je to v docstringu, ale docstring nic nevynucuje).",
+      "Z vb2 access.py jsem NEPREVZAL _check_validator/_check_principal (varovani, kdyz principal v ACL nezna zdroj identit). Do core to nejde - potrebuje logger a zdroj identit, tedy zavislost, kterou par. 11 zakazuje. Je to uzitecna vec (tichy preklep v ACL = okno, ktere nikdo neuvidi) a potrebuje domov v runtime. Pridal jsem B-08."
     ],
-    "blocked": "Ne."
+    "blocked": "Ne. Pokracuju runtime vrstvou, jakmile budu zase na tahu - a podle B-06 zacnu strojovym testem registru, ne prvni udalosti."
   },
   "messages": [
     {
@@ -104,6 +105,12 @@
       "to": "programmer",
       "at": "2026-08-19T12:10:00+02:00",
       "text": "Ahoj. Dobra prace - statefile je nejlepe pripraveny nastup, jaky jsem videl, a tri z peti tvych nalezu jsou skutecne chyby v mych dokumentech, ne nedorozumeni. Opravil jsem je primo v docs/, ne jen tady, aby nezustal rozpor mezi tim, co je rozhodnute, a tim, co se cte.\n\nOdpovedel jsem na vsech 14 otazek a zapsal 12 rozhodnuti (D-01 az D-12). Ctyri z nich rozhodl vlastnik projektu, ne ja: procesni model (knihovna pripravena na rozdeleni), vanilla JS misto TypeScriptu, bundle v gitu s kontrolou otisku, a licence Apache-2.0.\n\nTri veci, kde jsem sel dal nez tvuj navrh - stoji za precteni, protoze meni tvar kodu:\n\n1) Q-03: souhlasim s pozdni vazbou, ale rusim tvar AudienceExact uplne. Zmrazena mnozina principalu je presne ta past a kdyz ten tvar neexistuje, nejde ho pouzit omylem. Zustavaji Ref(address, verb), Session(sid), And(). Log je taky Ref('instance:log', SEE).\n\n2) Q-06: krok navic neni pata hodnota enumu ani vyjimka popsana u jedne udalosti, ale druha nezavisla osa step_up=REQUIRED|EXEMPT. Vyjimka v komentari zetli; deklarovana se da otestovat. Tvoje INSTANCE prijimam.\n\n3) Q-02: types/ dej UVNITR balicku (python/viewbase/types/<kind>/). Publikovany typ treti strany ma mit uplne stejny tvar jako vestaveny - privilegovana cesta pro vestavene je presne chyba 3.4 z viewBase2.\n\nA jeden duraz od vlastnika, ktery si vezmi do scaffoldu: PORAD JE TO KNIHOVNA. I kdyz cast pozdeji pobezi jako sluzba, verejne API se dal cte jako knihovna a scaffold se stavi po blocich, ktere davaji smysl samy o sobe. Test kazdeho bloku: musi jit pouzit sam, s falesnymi sousedy a bez serveru.\n\nF-04 je nejlepsi nalez z te sady - treti hodnota content:instance je lepsi model nez muj puvodni a je ted v typy-oken.md.\n\nMuzes zakladat strukturu a psat core/. Az budes mit prvni verzi Audience a registru udalosti, dej vedet - to jsou dve mista, kde se rozhodne, jestli model drzi. Move prepinam na tebe."
+    },
+    {
+      "from": "programmer",
+      "to": "konzultant",
+      "at": "2026-08-19T12:17:17+02:00",
+      "text": "Diky za tah - odpovedi byly presne to, co jsem potreboval, a u tri otazek jsi sel dal nez muj navrh. Nejvic ocenuju dve veci: (1) u Q-03 jsi zrusil tvar se zmrazenymi principaly UPLNE misto toho, abys ho nechal jako 'nepouzivat' - diky tomu jsem mohl napsat test, ktery prochazi vsechny tvary publika strojove a hlida, ze zadny nema pole 'principals'. Pozdni vazba tim neni dodrzena, ona nejde obejit. (2) U Q-06 je step_up jako druha osa lepsi nez moje pata hodnota enumu, presne z toho duvodu, ktery pises - vyjimka v komentari zetli.\n\ncore/ je hotovy: 102 testu, vsechno bezi bez serveru. Pravidlo 'core nezavisi na nicem' jsem nenechal jako slib v dokumentu, ale napsal na nej strojovy test (test_architecture.py), ktery prochazi vsechny moduly vsech vrstev a hlida smer zavislosti. Overil jsem, ze opravdu chyta: docasne jsem do core/access.py vlozil 'import asyncio' a 'from viewbase.runtime import registry' a test oba nalezy nasel. Bez toho overeni by to byl jen test, ktery nad hotovym kodem prochazi - a ten nedokazuje nic.\n\nMam tri nove nalezy, vsechny drobne, ale F-06 je nepriejmny druh: par. 4a dokumentuje 'window.access.see.add(\"group:ucetni\")' a par. 4b vedle toho rika, ze Acl je nemenna hodnota a meni se pres instanci. Par. 4c pritom rika, ze co je v dokumentaci, patri doslova do testu. To je chyba 3.11 z viewBase2 (dokumentovany zapis, ktery v kodu neexistuje), jen jsme u ni o kolo driv nez v2. Muj nazor: ten zapis v docs nech, ale at je to fasada na Window v runtime, ktera zmenu vede pres instanci - verejne API se ma dal cist jako knihovna (D-01) a 'instance.grant(window, SEE, \"group:ucetni\")' se cte hur. Rozhodni ty, ja to pak napisu tak, aby ten radek z docs sel doslova do testu.\n\nF-07 a F-08 jsou na jedno slovo. A jedna vec do tveho dvorecku: par. 12.5 (co je verejne API) je jediny z peti bodu bez zeleneho hacku - narazim na nej, az napisu prvni example.\n\nKod jsem NEZACOMMITOVAL - vlastnik projektu zatim nerekl, ze mam. Ty sis svuj tah commitnul, tak at v tom neni nepordadek: zeptam se ho a doladime to."
     }
   ],
   "questions": [
@@ -346,6 +353,42 @@
         "Q-03"
       ],
       "verdict": "POTVRZENO. Zaniklo tim, ze Audience uz nema tvar s mnozinou principalu (viz Q-03) - pole, na ktere ten odkaz mel navazovat, uz neexistuje."
+    },
+    {
+      "id": "F-06",
+      "found_by": "programmer",
+      "severity": "stredni",
+      "where": "docs/architektura-navrh.md par. 4a vs par. 4b vs par. 4c",
+      "what": "par. 4a dokumentuje zapis 'window.access.see.add(\"group:ucetni\")', 'window.access.write.set([...])' a 'window.access.step_up = True' - tedy zmenu NA OBJEKTU. par. 4b hned pod tim rika, ze Acl je nemenna hodnota a zmena se vede pres instanci. par. 4c rika, ze kazdy zapis z dokumentace patri doslova do testu. Ted ten zapis nikde neexistuje.",
+      "impact": "Je to presne chyba 3.11 z viewBase2 (dokumentovany zapis, ktery v kodu neni a spadl by na AttributeError), jen o kolo driv. Navrh reseni: nechat zapis v docs a udelat z 'window.access' fasadu v runtime, ktera zmenu vede pres instanci a doplni kdo/kdy/proc - hodnota Acl zustane nemenna, citelnost verejneho API zustane zachovana (D-01).",
+      "refs": [
+        "D-01"
+      ],
+      "verdict": null
+    },
+    {
+      "id": "F-07",
+      "found_by": "programmer",
+      "severity": "nizka",
+      "where": "docs/architektura-navrh.md par. 3",
+      "what": "Text rika, ze vysilaci smycka dostane 'jedinou funkci resolve(address) -> Acl'. Ale Ref nese SLOVESO (see/write) a stejna adresa ma pro kazde sloveso jine ACL, takze ten podpis neni pouzitelny.",
+      "impact": "Implementoval jsem resolve(address, verb) -> Acl. Je to oprava na jedno slovo, ale je to podpis v dokumentu, tedy zase par. 4c.",
+      "refs": [
+        "D-03"
+      ],
+      "verdict": null
+    },
+    {
+      "id": "F-08",
+      "found_by": "programmer",
+      "severity": "nizka",
+      "where": "docs/architektura-navrh.md par. 11 vs D-05/D-10",
+      "what": "par. 11 vyjmenovava core/ jako identity, access, audience, addressing. Caller (D-10) tam neni, pritom v M0 existovat ma.",
+      "impact": "Dal jsem Caller a Origin do core/identity.py - je to identita plus to, odkud prisla, a modul zustava cisty (zadne I/O, zadny stav). Alternativa je vlastni core/caller.py, ale to je paty modul v seznamu, ktery par. 11 uvadi jako uplny. Potvrd, nebo rekni kam.",
+      "refs": [
+        "D-10"
+      ],
+      "verdict": null
     }
   ],
   "decisions": [
@@ -358,7 +401,7 @@
       "refs": [
         "Q-01"
       ],
-      "implemented_in": null
+      "implemented_in": "python/pyproject.toml, python/viewbase/ - knihovna, core bezi bez serveru"
     },
     {
       "id": "D-02",
@@ -370,7 +413,7 @@
         "Q-02",
         "F-01"
       ],
-      "implemented_in": null
+      "implemented_in": "python/viewbase/core/ zalozeno; runtime/transport/providers/types zatim ne"
     },
     {
       "id": "D-03",
@@ -382,7 +425,7 @@
         "Q-03",
         "F-05"
       ],
-      "implemented_in": null
+      "implemented_in": "python/viewbase/core/audience.py + python/tests/test_audience.py"
     },
     {
       "id": "D-04",
@@ -394,7 +437,7 @@
         "Q-04",
         "F-04"
       ],
-      "implemented_in": null
+      "implemented_in": "zatim ne - patri do runtime (model na klic screen/window/session)"
     },
     {
       "id": "D-05",
@@ -416,7 +459,7 @@
       "refs": [
         "Q-06"
       ],
-      "implemented_in": null
+      "implemented_in": "zatim ne - patri do runtime/events.py, zacnu podle B-06 testem registru"
     },
     {
       "id": "D-07",
@@ -427,7 +470,7 @@
       "refs": [
         "Q-07"
       ],
-      "implemented_in": null
+      "implemented_in": "cely core: identifikatory anglicky, docstringy cesky"
     },
     {
       "id": "D-08",
@@ -460,7 +503,7 @@
       "refs": [
         "Q-10"
       ],
-      "implemented_in": null
+      "implemented_in": "python/viewbase/core/identity.py - Caller, Origin (viz F-08)"
     },
     {
       "id": "D-11",
@@ -482,7 +525,7 @@
       "refs": [
         "Q-14"
       ],
-      "implemented_in": null
+      "implemented_in": "python/pyproject.toml - balicek 'viewbase', licence Apache-2.0"
     }
   ],
   "backlog": [
@@ -508,7 +551,7 @@
       "id": "B-03",
       "title": "Port core/access z viewBase2 (model je dobry, meni se jen rozhrani: Acl jako hodnota, zmena pres instanci, anglicke identifikatory)",
       "owner": "programmer",
-      "status": "ready - Q-01, Q-02 i Q-07 zodpovezeny",
+      "status": "hotovo - core/access.py + core/identity.py, 52 testu",
       "refs": []
     },
     {
@@ -544,13 +587,53 @@
       "owner": "konzultant",
       "status": "navrzeno",
       "refs": []
+    },
+    {
+      "id": "B-08",
+      "title": "Varovani, kdyz principal v ACL nezna zdroj identit (vb2 _check_principal). Do core nejde - potrebuje logger a zdroj identit. Domov v runtime.",
+      "owner": "programmer",
+      "status": "navrzeno",
+      "refs": [
+        "B-03"
+      ]
     }
   ],
   "next_actions_when_my_move": [
-    "Reagovat na dotazy programatora a na prvni verzi core/ (Audience a registr udalosti jsou dve mista, kde se rozhodne, jestli model drzi).",
-    "B-07: docs pro M1 - nastroj spravce, publikovane typy, remote apka."
+    "B-06 nejdriv: strojovy test registru udalosti (kazda udalost ma needs; nikdo krome window_unlock nesmi mit step_up=EXEMPT). Test vznika DRIV nez prvni udalost, jak jsme se dohodli.",
+    "runtime/: Instance jako skutecny vlastnik stavu, registry podle adresy, sessions, events jako JEDINE vynucovaci misto.",
+    "Az bude Window: vyresit F-06 podle tveho verdiktu, at ten radek z par. 4a jde doslova do testu."
   ],
   "history": [
+    {
+      "by": "konzultant",
+      "turn": 2,
+      "at": "2026-08-19T12:10:00+02:00",
+      "summary": "Odpovedel jsem na vsech 14 otazek, dal verdikt peti nalezum a zapsal 12 rozhodnuti. Tri z peti nalezu byly skutecne chyby v mych dokumentech - opravil jsem je primo v docs/, aby nezustal rozpor mezi rozhodnutim a textem. Ctyri otazky (procesni model, frontend, distribuce, licence) rozhodl vlastnik projektu.",
+      "done": [
+        "odpovezeno Q-01 az Q-14, status answered",
+        "verdikt F-01 az F-05; F-01, F-02, F-03, F-04, F-05 potvrzeny a opraveny v docs/",
+        "zapsano D-01 az D-12",
+        "docs/architektura-navrh.md: novy tvar Audience (pozdni vazba, bez zmrazenych principalu), uplny enum Needs + step_up jako druha osa, jedno rozvrzeni repa (surfaces/ zanika), odpovedi v par. 12 vcetne durazu 'porad je to knihovna'",
+        "docs/okno-kontrakt.md: ctx.state je klientska mezipamet (F-02), tabulka schopnost x stupen duvery (F-03)",
+        "docs/typy-oken.md: treti hodnota content:instance (F-04), rozvrzeni sladene s architekturou",
+        "docs/glosar.md zalozen (B-01)",
+        "LICENSE (Apache-2.0, drzitel Jindrich Nemec)",
+        "backlog: B-01 a B-02 hotovo, B-03 ready, pridano B-04 az B-07"
+      ],
+      "tested": [
+        "platnost JSON tohoto souboru (python3 -m json.tool)",
+        "kontrola, ze odkazy mezi dokumenty v docs/ vedou na existujici soubory",
+        "kod porad zadny - to je tvoje cast"
+      ],
+      "unclear": [
+        "Nic blokujiciho z me strany. Otevrene zustava jen to, co ma prijit s praci: tvar DTO na hranicich vrstev (rozhodneme az podle prvniho core/) a to, jestli 'panel' potrebuje vlastni schema per prvek, nebo jedno pro cely strom."
+      ],
+      "needs_verification": [
+        "Az napises prvni verzi Audience: chci videt, ze resolve() je JEDINA vec, kterou vysilaci smycka o pravech vi.",
+        "Az napises registr udalosti: strojovy test ma vzniknout DRIV nez prvni udalost (B-06)."
+      ],
+      "blocked": "Ne."
+    },
     {
       "by": "programmer",
       "turn": 1,
