@@ -16,7 +16,6 @@ vsechno ostatni (D-17).
 """
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -25,6 +24,7 @@ from ..core.addressing import Address, new_id
 from ..core.identity import USERS
 from .access_facade import AccessFacade
 from .apps import AppCollection
+from .audit import AuditLog
 from .auth import AuthService
 from .content import ContentRegistry
 
@@ -37,24 +37,6 @@ from .registry import ObjectRegistry
 from .renderers import RendererCatalogue
 from .screen import Screen
 from .sessions import Grants
-
-
-@dataclass(frozen=True, slots=True)
-class AuditRecord:
-    """Jeden radek auditni stopy.
-
-    Audit je vlastni KOMPONENTA, ne uroven logu: zmena prav neni `warning`
-    a odepreni neni `error` (par. 7). Sloupce jsou pevne, aby sla stopa cist
-    po pozicich i strojove.
-    """
-
-    at: float
-    component: str
-    action: str
-    by: str
-    address: Address | None = None
-    verb: Verb | None = None
-    detail: str = ""
 
 
 class ScreenCollection:
@@ -121,7 +103,8 @@ class Instance:
         default_access: Iterable[str] = (USERS,),
         admin_access: Iterable[str] = (),
         knows_principal: Callable[[str], bool | None] | None = None,
-        audit: list[AuditRecord] | None = None,
+        audit: AuditLog | None = None,
+        log_level: str = "info",
         secret: str | bytes | None = None,
         app_timeouts: dict[str, float] | None = None,
         capabilities: Iterable[str] = DEFAULT_CAPABILITIES,
@@ -130,7 +113,9 @@ class Instance:
         self.objects = ObjectRegistry(default_access=Acl.from_iterable(default_access))
         self.events = EventRegistry()
         self.grants = Grants()
-        self.audit: list[AuditRecord] = audit if audit is not None else []
+        #: Auditni stopa instance. Sanace, redakce a sloupce resi ona; prah
+        #: plati na bezne zaznamy, na bezpecnostni nikdy (par. 7).
+        self.audit = audit if audit is not None else AuditLog(log_level, clock)
         self._knows_principal = knows_principal
         self._screens: dict[str, Screen] = {}
 
@@ -189,14 +174,14 @@ class Instance:
             else Access(see=current.see, write=new, step_up=current.step_up)
         )
         self.objects.replace_access(address, replacement)
-        self._record("access", verb.value, address, verb, ", ".join(sorted(new)))
+        self._security(verb.value, address, verb, ", ".join(sorted(new)))
 
     def set_step_up(self, address: Address, value: bool) -> None:
         current = self.objects.access_of(address)
         self.objects.replace_access(
             address, Access(see=current.see, write=current.write, step_up=value)
         )
-        self._record("access", "require_authentication", address, None, str(value).lower())
+        self._security("require_authentication", address, None, str(value).lower())
 
     def read_step_up(self, address: Address) -> bool:
         return self.objects.access_of(address).step_up
@@ -214,18 +199,38 @@ class Instance:
         verb: Verb | None = None,
         detail: str = "",
         by: str | None = None,
+        level: str = "info",
     ) -> None:
-        """`by` je v zaznamu VZDYCKY.
+        """Bezny auditni zaznam. Podleha prahu.
 
-        U vlastniho kodu knihovny je to `internal`. Az budou prava chodit po
-        drate, ponese totez pole skutecneho volajiciho; kdyby vzniklo teprve
-        tehdy, nedaji se starsi zaznamy porovnat s novejsimi. Prazdne pole je
-        horsi nez pole s hodnotou "vlastni kod".
+        `by` je v zaznamu VZDYCKY. U vlastniho kodu knihovny je to `internal`.
+        Az budou prava chodit po drate, ponese totez pole skutecneho
+        volajiciho; kdyby vzniklo teprve tehdy, nedaji se starsi zaznamy
+        porovnat s novejsimi. Prazdne pole je horsi nez pole s hodnotou
+        "vlastni kod".
         """
-        self.audit.append(
-            AuditRecord(
-                time.time(), component, action, by or self.INTERNAL, address, verb, detail
-            )
+        self.audit.record(
+            level, component=component, action=action, by=by or self.INTERNAL,
+            address=address, verb=verb, detail=detail,
+        )
+
+    def _security(
+        self,
+        action: str,
+        address: Address | None = None,
+        verb: Verb | None = None,
+        detail: str = "",
+        by: str | None = None,
+        level: str = "info",
+    ) -> None:
+        """Bezpecnostni stopa. PRAHU NEPODLEHA.
+
+        Zmena prav sem patri: "kdo co komu otevrel" musi jit dohledat i na
+        instanci, ktera bezi s `log_level='error'`.
+        """
+        self.audit.security(
+            level, action=action, by=by or self.INTERNAL,
+            address=address, verb=verb, detail=detail,
         )
 
     def _flag_unknown(self, name: str, address: Address) -> None:
@@ -240,11 +245,11 @@ class Instance:
         if self._knows_principal(name) is False:
             self._record(
                 "access", "unknown_principal", address, None,
-                f"{name} neni znam zdroji identit - preklep?",
+                f"{name} neni znam zdroji identit - preklep?", level="warning",
             )
 
     def _record_from_content(self, component: str, action: str, detail: str = "") -> None:
-        self._record(component, action, detail=detail)
+        self._record(component, action, detail=detail, level="warning")
 
     def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
         return f"<Instance screens={len(self._screens)}>"

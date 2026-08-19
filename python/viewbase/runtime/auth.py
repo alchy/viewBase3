@@ -102,8 +102,8 @@ class AuthService:
             return None
         if record.audience != audience:
             # Pokus pouzit token jinde, nez byl vydan. Do auditu vzdycky.
-            self._instance._record(
-                "auth", "token_wrong_audience",
+            self._instance._security(
+                "token_wrong_audience", level="warning",
                 detail=f"vydan pro {record.audience}, predlozen u {audience}",
             )
             return None
