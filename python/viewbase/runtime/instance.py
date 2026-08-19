@@ -248,8 +248,18 @@ class Instance:
                 f"{name} neni znam zdroji identit - preklep?", level="warning",
             )
 
-    def _record_from_content(self, component: str, action: str, detail: str = "") -> None:
-        self._record(component, action, detail=detail, level="warning")
+    def _record_from_content(
+        self, component: str, action: str, detail: str = "", security: bool = False
+    ) -> None:
+        """Stopa z obsahu.
+
+        Odmitnuty pristup k obsahu je BEZPECNOSTNI zaznam (pokus sahnout na
+        cizi), nedostupny obsah je provozni stav a podleha prahu.
+        """
+        if security:
+            self._security(action, detail=detail, level="warning")
+        else:
+            self._record(component, action, detail=detail, level="warning")
 
     def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
         return f"<Instance screens={len(self._screens)}>"

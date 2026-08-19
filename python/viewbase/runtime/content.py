@@ -339,10 +339,16 @@ class ContentRegistry:
             return None
         except ContentRefused as refusal:
             # Odmitnuti je odpoved, ne porucha - a divakovi se rika jinak.
+            #
+            # Do stopy jde ale jako BEZPECNOSTNI zaznam: pokus sahnout na cizi
+            # obsah je presne to, co chce spravce videt i na instanci bezici
+            # s log_level='error'. Ve viewBase2 to znelo "access to window
+            # refused" a bylo to auditni.
             content.state = ContentState.REFUSED
             self._audit(
                 "content", "content_refused",
                 detail=f"{content.app_id} {what}: {refusal}",
+                security=True,
             )
             return None
         except Exception as problem:  # apka je cizi kod; nesmi shodit instanci
@@ -356,4 +362,4 @@ class ContentRegistry:
         self._audit(
             "content", "content_unavailable",
             detail=f"{content.app_id} {what}: {why}",
-        )
+        )  # provozni stav, ne bezpecnostni udalost - podleha prahu

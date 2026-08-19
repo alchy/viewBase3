@@ -9,7 +9,12 @@ description = "Plochy a okna v prohlizeci jako knihovna: Instance, Screen, Windo
 requires-python = ">=3.12"
 license = { file = "../LICENSE" }
 authors = [{ name = "Jindrich Nemec" }]
-dependencies = []
+dependencies = [
+    # TOTP a QR nejsou volitelny extra: bez nich se nedá zalozit identita
+    # a do instance se nikdo neprihlasi (D-11).
+    "pyotp>=2.9",
+    "qrcode>=7.4",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

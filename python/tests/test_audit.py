@@ -14,19 +14,23 @@ Uroven rika, JAK JE TO ZLE. Komponenta rika, ZE JDE O BEZPECNOSTNI STOPU.
 Uspesne odemceni neni `warning` a odmitnuty kod neni `error`.
 """
 import dataclasses
+import pathlib
 
 import pytest
 
-from viewbase.runtime.audit import (
+# Ciste funkce a tvar zaznamu jsou v core (nezavisi na nicem), nadoba se
+# stavem a prahem v runtime. Testy si to berou odtud, kde to opravdu je -
+# jinak by re-export zakryl, kdyby se to zase slilo dohromady.
+from viewbase.core.audit import (
     LEVELS,
     MAX_DETAIL,
     SECURITY,
     SESSION_PREFIX,
-    AuditLog,
     Record,
     redact,
     sanitize,
 )
+from viewbase.runtime.audit import AuditLog
 
 
 # ===========================================================================
@@ -297,3 +301,85 @@ def test_every_record_from_the_instance_says_who_did_it():
     instance, window = instance_at("info")
     window.access.see.set(["group:ucetni"])
     assert all(r.by for r in instance.audit)
+
+
+def test_the_pure_half_of_the_audit_needs_nothing_from_the_runtime():
+    """Sanace a redakce se musi dat pouzit i tam, kde zadna instance neni -
+    treba v nastroji spravce nebo v testu apky.
+
+    Bezi to v SAMOSTATNEM PROCESU zamerne: v tomhle uz je runtime davno
+    naimportovany, takze by import v nem nic nedokazal. (Prvni verze tohohle
+    testu mazala moduly ze sys.modules a rozbila tim jine testy - mit test
+    s globalnim vedlejsim ucinkem je horsi nez ten test nemit.)
+    """
+    import subprocess
+    import sys
+
+    script = (
+        "import sys\n"
+        "from viewbase.core.audit import sanitize, redact\n"
+        "assert sanitize('\\x1b[2J') == '\\\\x1b[2J'\n"
+        "assert redact({'token': 'abc'})['token'] == '<redacted:3>'\n"
+        "leaked = [n for n in sys.modules if n.startswith('viewbase.runtime')]\n"
+        "assert not leaked, leaked\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(pathlib.Path(__file__).resolve().parent.parent),
+        capture_output=True,
+        text=True,
+    )
+    assert done.returncode == 0, done.stderr
+
+
+def test_a_refused_access_to_content_survives_the_strictest_threshold():
+    # Pokus sahnout na cizi obsah je presne to, co chce spravce videt
+    # i na instanci bezici s log_level='error'.
+    import viewbase as vb
+    from viewbase.runtime.content import ContentRefused
+
+    class Odmitava:
+        def open_content(self, handle, spec, subject):
+            raise ContentRefused("tenhle obsah ti nedam")
+
+        def snapshot(self, handle, subject):
+            raise ContentRefused("tenhle obsah ti nedam")
+
+        def apply_event(self, handle, subject, event):
+            return []
+
+        def close_content(self, handle):
+            pass
+
+    instance = vb.Instance(log_level="error")
+    instance.app.register("a", kind="graph", scope="app", backend=Odmitava())
+    instance.screen.open(id="infra").window.open("graph", id="net", app="a")
+
+    refusals = [r for r in instance.audit if r.action == "content_refused"]
+    assert refusals
+    assert refusals[0].component == SECURITY
+
+
+def test_an_unavailable_content_stays_an_ordinary_record():
+    # Spadly kontejner je provozni stav, ne bezpecnostni udalost - jinak by
+    # se bezpecnostni stopa zaplnila restarty.
+    import viewbase as vb
+
+    class Spadla:
+        def open_content(self, handle, spec, subject):
+            raise ConnectionError("spadla")
+
+        def snapshot(self, handle, subject):
+            raise ConnectionError("spadla")
+
+        def apply_event(self, handle, subject, event):
+            return []
+
+        def close_content(self, handle):
+            pass
+
+    instance = vb.Instance(log_level="error")
+    instance.app.register("a", kind="graph", scope="app", backend=Spadla())
+    instance.screen.open(id="infra").window.open("graph", id="net", app="a")
+
+    assert not any(r.action == "content_unavailable" for r in instance.audit)
