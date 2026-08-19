@@ -1,0 +1,23 @@
+{
+  "app_id": "workbench.graph",
+  "kind": "graph",
+  "contract": "graph.v1",
+  "scope": "explicit",
+  "groups_of_interest": ["group:administrator"],
+  "events": {
+    "node_click": { "needs": "screen", "profile": "request" },
+    "reload":     { "needs": "write",  "profile": "request" },
+    "rename":     { "needs": "write",  "profile": "request" }
+  },
+  "menu": {
+    "label": "Graph",
+    "items": [
+      { "id": "reload", "label": "Reload from source", "type": "command",
+        "needs": "write", "profile": "request" },
+      { "id": "rename", "label": "Rename…", "type": "command",
+        "needs": "write", "profile": "request" },
+      { "id": "exit", "label": "Exit", "type": "command",
+        "needs": "write", "profile": "request", "destructive": true }
+    ]
+  }
+}
