@@ -14,15 +14,15 @@ def app():
 def test_bez_rukojeti_zaklada_a_pojmenovava(app):
     prvni = app.open_content(None, {}, HANA)
     druhy = app.open_content(None, {}, HANA)
-    assert prvni["name"] == "Graph #1" and druhy["name"] == "Graph #2"
+    assert prvni["title"] == "Graph #1" and druhy["title"] == "Graph #2"
     assert prvni["handle"] != druhy["handle"]
 
 
 def test_cislovani_jmen_je_na_vlastnika(app):
     """„Graph #1" má každý svoje – jinak by jméno prozradilo, kolik grafů
     má někdo jiný."""
-    a = app.open_content(None, {}, HANA)["name"]
-    b = app.open_content(None, {}, {"subject_id": "user:karel", "capabilities": ["read", "write"]})["name"]
+    a = app.open_content(None, {}, HANA)["title"]
+    b = app.open_content(None, {}, {"subject_id": "user:karel", "capabilities": ["read", "write"]})["title"]
     assert a == b == "Graph #1"
 
 
@@ -36,7 +36,7 @@ def test_snapshot_nese_stav_i_kurzor(app):
     h = app.new_content("user:hana")
     app.content(h, HANA).add_node("a")
     snap = app.snapshot(h, HANA)
-    assert set(snap) >= {"state", "cursor", "name"}
+    assert set(snap) >= {"state", "cursor", "title"}
     assert snap["cursor"] == 1 and len(snap["state"]["nodes"]) == 1
 
 

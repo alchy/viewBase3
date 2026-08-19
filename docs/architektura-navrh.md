@@ -579,6 +579,13 @@ nenastavené `manage` by spadlo až na `default_access`, takže by objekt směl
 zrušit kdokoli přihlášený, a musela by se přidat výjimka „manage se dědí
 jinak". Pravidlo navíc kvůli vlastnosti, kterou skoro nikdo nepoužije.
 
+**Odvodí se ale jen tam, kde platí `read`.** Zakladatelství samo nestačí:
+kdo na objekt nemá `read`, nemá ani `manage`. Bez té podmínky vyjde
+„smíš nevratně zasáhnout do něčeho, co ani nevidíš" — a co je horší, kdo
+zakladateli práva zúžil, by mu nevzal nic a myslel si, že vzal. Zamknout
+se dá i sám sebe; cesta zpátky vede přes **správce**, který stojí nad ACL.
+Vyšlo to z F-22 a nenašla to testovací sada, ale spuštěný skript.
+
 ### Průnik má dva členy
 
 ```
@@ -656,6 +663,38 @@ případech** — a všechny mají společné, že obsah **přežije jedno okno*
 | plní ho **dávková úloha** | musí existovat dřív, než někdo něco otevře, a je potřeba rukojeť |
 | **jiná práva na obsah než na okno** | „dokument vidí i ředitel, přepisuje ho jen účtárna — ať visí kdekoli" |
 
+### Titulek se nepíše dvakrát a apka se neopakuje
+
+`title` je **jedno slovo pro popisek čehokoli** — plochy, okna, obsahu
+i nabídky. `name` v tomhle významu neexistuje.
+
+Nabídka připnutá k obsahu si titulek **vezme z obsahu**, takže se nepíše
+dvakrát. Nejsou to přesto dvě jména téhož: `content.title` patří dokumentu
+(mění ho uživatel za běhu, platí všude stejně), `offer.title` patří položce
+menu **jedné plochy** (píše ho vývojář, na každé ploše může být jiná).
+Kdyby to bylo jedno pole, přejmenování dokumentu uživatelem by přepsalo
+vývojářovo menu na všech plochách.
+
+```python
+scr_risk.app.register(cnt_rizika)                       # titulek Z OBSAHU, živě
+scr_zasedacka.app.register(cnt_rizika, title="Rizika")  # pevný štítek
+```
+
+**Nenastavený `title` je odkaz, nastavený je hodnota.** Bez obsahu je
+povinný — není podle čeho pojmenovat, a registrace bez něj selže při startu.
+
+Apku už taky psát nemusíte: obsah vznikl z `app_excel.content.open(...)`,
+takže **svou apku zná**. Jmenovat ji znovu je nejen navíc — jde to napsat
+špatně, a runtime by pak musel hlídat, že `content` patří té apce, kterou
+jsem uvedl. Když se odvodí, ta chyba přestane být vyjádřitelná.
+
+| zápis | apka | titulek |
+|---|---|---|
+| `register(cnt_mzdy)` | z obsahu | z obsahu, živě |
+| `register(cnt_mzdy, title="…")` | z obsahu | pevný |
+| `register(app_excel, title="…")` | uvedená | povinný |
+| `register(app_excel)` | uvedená | **chyba při startu** |
+
 ### Úplný příklad: jeden excel, dvě oddělení
 
 Fiktivní tabulkový procesor. Účtárna má `Mzdy.xls`, risk má `Rizika.xls`,
@@ -683,23 +722,22 @@ scr_zasedacka = inst.screen.open(title="Zasedačka", id="zasedacka",
                                  read=["group:public"], write=[])   # [] = nikdo
 
 # ── 4. dokumenty: obsah, který přežije zavření okna ────────────────────────
-cnt_mzdy = app_excel.content.open(name="Mzdy.xls",
+cnt_mzdy = app_excel.content.open(title="Mzdy.xls",
                                   read=["group:uctarna", "user:novak"],
                                   write=["group:uctarna"])
 
-cnt_rizika = app_excel.content.open(name="Rizika.xls",
+cnt_rizika = app_excel.content.open(title="Rizika.xls",
                                     read=["group:risk", "user:novak"],
                                     write=["group:risk"])
 
 # ── 5. nabídky: co jde kde otevřít ─────────────────────────────────────────
-scr_uctarna.app.register(app_excel, title="Mzdy.xls", content=cnt_mzdy,
-                         require_authentication=True)   # navíc si řekne o kód
-scr_uctarna.app.register(app_excel, title="Nový sešit")  # bez content
+scr_uctarna.app.register(cnt_mzdy, require_authentication=True)  # + krok navíc
+scr_uctarna.app.register(app_excel, title="Nový sešit")          # bez obsahu
 
-scr_risk.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
-scr_risk.app.register(app_excel, title="Mzdy.xls",   content=cnt_mzdy)
+scr_risk.app.register(cnt_rizika)
+scr_risk.app.register(cnt_mzdy)
 
-scr_zasedacka.app.register(app_excel, title="Rizika.xls", content=cnt_rizika)
+scr_zasedacka.app.register(cnt_rizika)
 
 inst.serve()
 ```

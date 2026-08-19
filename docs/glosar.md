@@ -36,7 +36,7 @@ změnit, změní se tady a pak všude.
 | **principál** | `user:hana`, `group:ucetni` — to, proti čemu se vyhodnocuje ACL |
 | **ACL** | množina povolených principálů. Žádné „deny". |
 | **sloveso** | `read` (vidět) / `write` (zasahovat) — **jen tyhle dvě** |
-| **manage** | není sloveso ACL: **odvozené** právo zakladatele objektu nebo správce (přejmenovat, zrušit, změnit ACL) |
+| **manage** | není sloveso ACL: **odvozené** právo zakladatele objektu nebo správce (přejmenovat, zrušit, změnit ACL). Odvodí se **jen když na objekt platí `read`** — nad neviditelný objekt schopnost nevede (D-68). |
 | **nabídka** | „tuhle apku jde na téhle ploše otevřít" — přežije zavření okna |
 | **krok navíc** (step-up) | „jsi to fakt ty, teď?" — kód z autentikátoru u soukromého okna. Ortogonální k ACL. |
 | **adresa** | `screen:<id>`, `screen:<id>/window:<id>`, `instance:log`. Klíč pro práva, log i vzdálené volání. |
@@ -65,6 +65,7 @@ proto uvádí, jak se pojem jmenuje v kódu:
 | stupeň důvěry | `trust` |
 | schopnost | `capability` |
 | plocha je brána | `screen_gate` |
+| lidský popisek čehokoli | `title` — plochy, okna, obsahu i nabídky. `name` v tomhle významu **neexistuje**. |
 
 Totéž platí pro klíče payloadu, jména souborů, parametry cest v routách
 a jména v konfiguraci — anglicky. Texty pro diváka jdou ze serveru jako

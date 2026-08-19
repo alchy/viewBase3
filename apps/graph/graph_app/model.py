@@ -47,9 +47,11 @@ class GraphContent:
     klientské API (dávková úloha) současně.
     """
 
-    def __init__(self, handle: str, name: str, owner: str) -> None:
+    def __init__(self, handle: str, title: str, owner: str) -> None:
         self.handle = handle
-        self.name = name
+        #: lidský popisek obsahu. Jmenuje se `title` stejně jako u plochy,
+        #: okna i nabídky — jedno slovo pro „co se o tom napíše člověku".
+        self.title = title
         #: kdo obsah založil; podle toho se rozhoduje o destruktivních akcích
         self.owner = owner
         self._lock = threading.RLock()

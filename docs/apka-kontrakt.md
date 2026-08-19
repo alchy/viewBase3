@@ -83,7 +83,7 @@ Nahrazuje dřívější `content: shared | per-session | instance` a zobecňuje 
 | `user` | okno + uživatel | **osobní graf** — dva taby, jeden obsah |
 | `instance` | instance **+ app_id** | **log** — jeden proud na apku; dvě apky si nesmí sdílet rukojeť |
 | `app` | nic (jedna rukojeť) | společná mapa sítě pro všechny |
-| `explicit` | nic; `handle=` je povinný | dávkové plnění zvenčí |
+| `explicit` | nic; nabídka bez obsahu razí **čerstvou** rukojeť, přímá vazba zvenčí vyžaduje `handle=` | dávkové plnění zvenčí, „Nový sešit" |
 
 `session` a `user` **nejsou totéž** a splynutí je chyba: shell chce
 per-session (dva terminály jsou dva terminály), osobní graf chce per-user
@@ -119,6 +119,12 @@ a apka se stává použitelnou i tam, kde žádná okna nejsou.
 | `read` | smí obsah vidět |
 | `write` | smí do něj zasahovat |
 | `manage` | smí i to, co jinak přísluší **vlastníkovi** — destruktivní akce (D-41) |
+
+**`manage` bez `read` se nikdy neposílá** (D-68). Zakladatelství samo o sobě
+nestačí: kdo na obsah nemá `read`, nedostane ani `manage`. Jinak by apce
+přišlo „smíš nevratně zasáhnout do obsahu, který ani nevidíš" — a hůř: kdo
+zakladateli práva zúžil, by si myslel, že mu je vzal, a nevzal by mu nic.
+Zamknout se dá i sám sebe; cesta zpátky je **správce**, který stojí nad ACL.
 
 `manage` dostane vlastník obsahu **a správce**. Apka se ale nedozví, **kdo
 z nich to je** — jen že na to má. Je to schválně:

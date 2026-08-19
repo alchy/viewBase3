@@ -48,7 +48,7 @@ class GraphApp:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._contents: dict[str, GraphContent] = {}
-        #: čísluje jména PER VLASTNÍKA, takže „Graph #1" má každý svoje
+        #: čísluje titulky PER VLASTNÍKA, takže „Graph #1" má každý svoje
         self._counters: dict[str, itertools.count] = {}
 
     # -- prezentační kanál (volá instance) ---------------------------------
@@ -67,7 +67,7 @@ class GraphApp:
         owner = str(subject.get("subject_id") or "anonymous")
         with self._lock:
             if handle is None:
-                content = self._create(owner, spec.get("name"))
+                content = self._create(owner, spec.get("title"))
             else:
                 content = self._contents.get(handle)
                 if content is None:
@@ -75,7 +75,7 @@ class GraphApp:
                 if not self._may_touch(content, subject):
                     raise ContentRefused(
                         f"'{owner}' nemá přístup k obsahu {handle}")
-            return {**content.snapshot(), "name": content.name,
+            return {**content.snapshot(), "title": content.title,
                     "handle": content.handle}
 
     def snapshot(self, handle: str, subject: dict[str, Any]) -> dict[str, Any]:
@@ -87,7 +87,7 @@ class GraphApp:
         Kontroluje se jen vlastnictví obsahu, což je doména apky.
         """
         content = self._require(handle, subject)
-        return {**content.snapshot(), "name": content.name}
+        return {**content.snapshot(), "title": content.title}
 
     def apply_event(self, handle: str, subject: dict[str, Any],
                     event: dict[str, Any]) -> list[dict[str, Any]]:
@@ -99,8 +99,8 @@ class GraphApp:
                     for c in self._reload(content)]
         if name == "rename":
             with self._lock:
-                content.name = str(event.get("name") or content.name)
-            return [{"kind": "renamed", "name": content.name}]
+                content.title = str(event.get("title") or content.title)
+            return [{"kind": "renamed", "title": content.title}]
         return []                       # neznámou událost apka mlčky ignoruje
 
     def close_content(self, handle: str) -> None:
@@ -118,7 +118,7 @@ class GraphApp:
         Workbench rozhoduje o oknech, ne o tom, čí je který graf.
         """
         with self._lock:
-            return [{"handle": c.handle, "name": c.name}
+            return [{"handle": c.handle, "title": c.title}
                     for c in self._contents.values()
                     if self._may_touch(c, subject)]
 
@@ -143,12 +143,12 @@ class GraphApp:
 
     # -- vnitřní ------------------------------------------------------------
 
-    def _create(self, owner: str, name: str | None) -> GraphContent:
+    def _create(self, owner: str, title: str | None) -> GraphContent:
         handle = "vb1_" + secrets.token_hex(8)
-        if name is None:
+        if title is None:
             counter = self._counters.setdefault(owner, itertools.count(1))
-            name = f"Graph #{next(counter)}"
-        content = GraphContent(handle, name, owner)
+            title = f"Graph #{next(counter)}"
+        content = GraphContent(handle, title, owner)
         self._contents[handle] = content
         return content
 
