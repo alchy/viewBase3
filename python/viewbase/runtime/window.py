@@ -16,16 +16,32 @@ class Window:
     kdy okno existuje, ale jeste nema adresu - a tedy ani prava - tu neni.
     """
 
-    __slots__ = ("_instance", "address", "kind", "title", "access")
+    __slots__ = ("_instance", "_app", "address", "kind", "title", "access")
 
     def __init__(
-        self, instance: AccessOwner, address: Address, kind: str, title: str | None
+        self,
+        instance: AccessOwner,
+        address: Address,
+        kind: str,
+        title: str | None,
+        app: str | None = None,
     ) -> None:
         self._instance = instance
+        self._app = app
         self.address = address
         self.kind = kind
         self.title = title
         self.access = AccessFacade(instance, address)
+
+    @property
+    def app(self) -> str | None:
+        """Odkud je obsah, nebo None pro lokalni obsah.
+
+        Cte se, ale nenastavuje: vazbu zaklada ten, kdo okno otevira. Kdyby
+        sla prepsat za behu, byl by to druhy zpusob, jak okno spojit s apkou -
+        a jeden z nich by se prestal kontrolovat.
+        """
+        return self._app
 
     @property
     def id(self) -> str:

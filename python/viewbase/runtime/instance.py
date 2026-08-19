@@ -24,6 +24,7 @@ from ..core.access import Access, Acl, Verb
 from ..core.addressing import Address, new_id
 from ..core.identity import USERS
 from .access_facade import AccessFacade
+from .apps import AppCollection
 from .events import EventRegistry, Guard
 from .registry import ObjectRegistry
 from .screen import Screen
@@ -42,6 +43,7 @@ class AuditRecord:
     at: float
     component: str
     action: str
+    by: str
     address: Address | None = None
     verb: Verb | None = None
     detail: str = ""
@@ -126,14 +128,20 @@ class Instance:
         )
         self.access = AccessFacade(self, Address.instance_root())
         self.screen = ScreenCollection(self)
+        self.app = AppCollection()
         self.guard = Guard(events=self.events, objects=self.objects, grants=self.grants)
 
     # -- jedina cesta ke zmene prav (D-14) -------------------------------
 
-    def own_acl(self, address: Address, verb: Verb) -> Acl:
-        """ACL NASTAVENE na objektu, bez dedicnosti. Nenastavene = prazdne."""
-        acl = self.objects.access_of(address).for_verb(verb)
-        return Acl.empty() if acl is None else acl
+    def own_acl(self, address: Address, verb: Verb) -> Acl | None:
+        """ACL NASTAVENE primo na objektu, nebo None, kdyz se dedi.
+
+        Zamerne se NEPTA pres `for_verb`: ten u nenastaveneho `write` padne na
+        `see`, coz je spravne pro CTENI prav, ale tady by to znamenalo, ze
+        `write.add()` tise zmrazi hodnotu prectenou ze `see`.
+        """
+        access = self.objects.access_of(address)
+        return access.see if verb is Verb.SEE else access.write
 
     def set_access(self, address: Address, verb: Verb, new: Acl) -> None:
         """Zmen ACL objektu a zapis o tom auditni zaznam.
@@ -165,6 +173,9 @@ class Instance:
 
     # -- audit ------------------------------------------------------------
 
+    #: Kdo zmenu udelal, kdyz to byl vlastni kod knihovny (D-10, par. 4b).
+    INTERNAL = "internal"
+
     def _record(
         self,
         component: str,
@@ -172,9 +183,19 @@ class Instance:
         address: Address | None = None,
         verb: Verb | None = None,
         detail: str = "",
+        by: str | None = None,
     ) -> None:
+        """`by` je v zaznamu VZDYCKY.
+
+        U vlastniho kodu knihovny je to `internal`. Az budou prava chodit po
+        drate, ponese totez pole skutecneho volajiciho; kdyby vzniklo teprve
+        tehdy, nedaji se starsi zaznamy porovnat s novejsimi. Prazdne pole je
+        horsi nez pole s hodnotou "vlastni kod".
+        """
         self.audit.append(
-            AuditRecord(time.time(), component, action, address, verb, detail)
+            AuditRecord(
+                time.time(), component, action, by or self.INTERNAL, address, verb, detail
+            )
         )
 
     def _flag_unknown(self, name: str, address: Address) -> None:

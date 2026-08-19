@@ -38,24 +38,53 @@ class WindowCollection:
         *,
         id: str | None = None,
         title: str | None = None,
+        app: str | None = None,
         access: Access | None = None,
     ) -> Window:
-        """Otevri okno daneho typu.
+        """Otevri okno daneho typu a volitelne ho spoj s apkou.
 
         `kind` se proti nicemu neoveruje: registr typu zatim neexistuje
         a hlavne publikovany typ treti strany se ma otevrit stejne snadno
         jako vestaveny.
+
+        `app` naopak overuje se, a HNED. Neznama a nedostupna apka jsou dve
+        ruzne veci (D-24): `app` mimo registr je chyba autora a ma se ozvat
+        okamzite se seznamem registrovanych - prave to chyta preklepy.
+        Registrovana apka, ktera neodpovida, je provozni stav a resi se az
+        pri volani, aby jedna mrtva apka nezastavila celou instanci.
+
+        Bez `app` je obsah LOKALNI: dodava ho kod, ktery okno otevrel.
         """
         screen = self._screen
+        instance = screen._instance
         window_id = id if id is not None else new_id()
         address = Address.window(screen.id, window_id)
-        if address in screen._instance.objects:
+        if address in instance.objects:
             raise ValueError(f"okno uz na plose je: {window_id!r}")
 
-        screen._instance.objects.add(address, access if access is not None else Access())
-        window = Window(screen._instance, address, kind, title)
+        # Nejdriv overit, teprve potom zapsat: polovicne otevrene okno by melo
+        # adresu v registru a nikdo by o nem nevedel.
+        if app is not None:
+            self._check_app(app, kind)
+
+        instance.objects.add(address, access if access is not None else Access())
+        window = Window(instance, address, kind, title, app)
         screen._windows[window_id] = window
         return window
+
+    def _check_app(self, app: str, kind: str) -> None:
+        registry = self._screen._instance.app
+        if app not in registry:
+            raise ValueError(
+                f"apka {app!r} neni registrovana. Zname apky: "
+                f"{', '.join(registry.known()) or '(zadne)'}"
+            )
+        declared = registry.get(app).kind
+        if declared is not None and declared != kind:
+            raise ValueError(
+                f"apka {app!r} dodava obsah pro kind {declared!r}, ale okno se "
+                f"otevira jako {kind!r} - ten renderer by jeji obsah nevykreslil"
+            )
 
     def get(self, window_id: str) -> Window:
         return self._screen._windows[window_id]

@@ -238,38 +238,104 @@ def prepared():
     return instance, screen, window
 
 
-def test_documented_line_window_access_see_add():
-    # architektura-navrh.md par. 4a, doslova.
-    instance, _, window = prepared()
-    window.access.see.add("group:ucetni")
-    assert "group:ucetni" in instance.objects.resolve(window.address, Verb.SEE)
+def test_documented_lines_from_the_docs_verbatim():
+    """architektura-navrh.md par. 4a, doslova a ve stejnem poradi.
 
-
-def test_documented_line_window_access_write_set():
+    Poradi neni kosmetika: `set` zaklada vlastni ACL a KONCI DEDENI, teprve
+    potom ma `add` co rozsirit (D-25).
+    """
     instance, _, window = prepared()
+
+    window.access.see.set(["group:ucetni"])       # vlastni ACL okna; konci dedeni
+    window.access.see.add("user:hana")            # ...a jeste konkretni clovek
     window.access.write.set(["user:hana"])
-    assert instance.objects.resolve(window.address, Verb.WRITE) == Acl.of("user:hana")
-
-
-def test_documented_line_window_access_require_authentication():
-    # architektura-navrh.md par. 4a, doslova. Verejne jmeno rika, co se stane;
-    # vnitrni osa se dal jmenuje step_up, protoze pojmenovava mechanismus.
-    instance, _, window = prepared()
     window.access.require_authentication = True
+
+    assert instance.objects.resolve(window.address, Verb.SEE) == Acl.of(
+        "group:ucetni", "user:hana"
+    )
+    assert instance.objects.resolve(window.address, Verb.WRITE) == Acl.of("user:hana")
     assert instance.objects.step_up_at(window.address) is True
 
 
-def test_the_public_property_reads_back():
+def test_documented_line_window_access_see_list():
+    # architektura-navrh.md par. 4b, doslova.
     _, _, window = prepared()
-    window.access.require_authentication = True
-    assert window.access.require_authentication is True
+    window.access.see.set(["group:ucetni"])
+    assert window.access.see.list() == ["group:ucetni"]
 
 
-def test_the_public_surface_does_not_use_the_internal_name():
-    # Kdyby fasada nabizela obe jmena, dokumentace by prestala byt zavazna
-    # a v kodu aplikaci by se objevila obe.
+# -- add/remove na dedicim objektu skonci chybou s navodem (D-25) ----------
+
+
+def test_add_on_an_inheriting_window_is_refused():
+    # Oba mozne vyklady jsou spatne, takze se nevybira ani jeden: dvojznacnost
+    # zmizi tam, kde by kousla.
     _, _, window = prepared()
-    assert not hasattr(window.access, "step_up")
+    with pytest.raises(ValueError):
+        window.access.see.add("group:ucetni")
+
+
+def test_the_refusal_says_what_to_do_instead():
+    # Chyba bez navodu je jen jina podoba te same pasti.
+    _, _, window = prepared()
+    with pytest.raises(ValueError, match="set"):
+        window.access.see.add("group:ucetni")
+
+
+def test_remove_on_an_inheriting_window_is_refused_too():
+    _, _, window = prepared()
+    with pytest.raises(ValueError):
+        window.access.see.remove("group:public")
+
+
+def test_set_always_works_because_it_says_what_it_does():
+    _, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    assert window.access.see.list() == ["group:ucetni"]
+
+
+def test_add_works_once_the_object_has_its_own_acl():
+    instance, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    window.access.see.add("user:hana")
+    assert "user:hana" in instance.objects.resolve(window.address, Verb.SEE)
+
+
+def test_setting_see_does_not_make_write_settable_by_add():
+    # `write` nenastavene padne pri CTENI na `see`, ale vlastni ACL to neni -
+    # jinak by `write.add()` tise zmrazilo hodnotu prectenou ze `see`.
+    _, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    with pytest.raises(ValueError):
+        window.access.write.add("user:hana")
+
+
+def test_an_empty_own_acl_still_counts_as_owned():
+    # `set([])` je rozhodnuti "nikdo", ne "nenastaveno" - add na nem projit ma.
+    instance, _, window = prepared()
+    window.access.see.set([])
+    window.access.see.add("group:ucetni")
+    assert instance.objects.resolve(window.address, Verb.SEE) == Acl.of("group:ucetni")
+
+
+def test_reading_an_inheriting_acl_does_not_raise():
+    # Cteni nesmi nikdy vybuchnout; vraci to, co na objektu STOJI.
+    _, _, window = prepared()
+    assert window.access.see.list() == []
+
+
+def test_screens_have_the_same_facade():
+    instance = vb.Instance()
+    screen = instance.screen.open(id="provoz")
+    screen.access.see.set(["group:ucetni"])
+    assert "group:ucetni" in instance.objects.resolve(screen.address, Verb.SEE)
+
+
+def test_a_bare_name_becomes_a_group_here_too():
+    instance, _, window = prepared()
+    window.access.see.set(["ucetni"])
+    assert "group:ucetni" in instance.objects.resolve(window.address, Verb.SEE)
 
 
 def test_removing_a_principal_is_removal_from_the_allowed_not_a_ban():
@@ -289,17 +355,17 @@ def test_reading_the_access_gives_a_snapshot():
     assert window.access.see.list() == ["group:ucetni"]
 
 
-def test_screens_have_the_same_facade():
-    instance = vb.Instance()
-    screen = instance.screen.open(id="provoz")
-    screen.access.see.add("group:ucetni")
-    assert "group:ucetni" in instance.objects.resolve(screen.address, Verb.SEE)
+def test_the_public_surface_does_not_use_the_internal_name():
+    # Kdyby fasada nabizela obe jmena, dokumentace by prestala byt zavazna
+    # a v kodu aplikaci by se objevila obe.
+    _, _, window = prepared()
+    assert not hasattr(window.access, "step_up")
 
 
-def test_a_bare_name_becomes_a_group_here_too():
-    instance, _, window = prepared()
-    window.access.see.add("ucetni")
-    assert "group:ucetni" in instance.objects.resolve(window.address, Verb.SEE)
+def test_the_public_property_reads_back():
+    _, _, window = prepared()
+    window.access.require_authentication = True
+    assert window.access.require_authentication is True
 
 
 # -- kazda zmena prav je auditni udalost ------------------------------------
@@ -307,7 +373,7 @@ def test_a_bare_name_becomes_a_group_here_too():
 
 def test_changing_access_is_recorded():
     instance, _, window = prepared()
-    window.access.see.add("group:ucetni")
+    window.access.see.set(["group:ucetni"])
     assert any(record.address == window.address for record in instance.audit)
 
 
@@ -332,6 +398,25 @@ def test_reading_the_access_is_not_an_audit_event():
     assert len(instance.audit) == before
 
 
+# -- B-14: `by` je v zaznamu VZDYCKY --------------------------------------
+
+
+def test_every_audit_record_says_who_did_it():
+    # Prazdne pole je horsi nez pole s hodnotou "vlastni kod": az budou prava
+    # chodit po drate, ponese totez pole skutecneho volajiciho a starsi
+    # zaznamy pujdou porovnat s novejsimi.
+    instance, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    window.access.require_authentication = True
+    assert all(record.by for record in instance.audit)
+
+
+def test_a_change_from_library_code_is_recorded_as_internal():
+    instance, _, window = prepared()
+    window.access.see.set(["group:ucetni"])
+    assert instance.audit[-1].by == "internal"
+
+
 # -- B-08: principal, ktereho nezna zdroj identit --------------------------
 
 
@@ -343,7 +428,7 @@ def test_an_unknown_principal_is_written_but_flagged():
     instance = vb.Instance(knows_principal=lambda name: name in seen)
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
 
-    window.access.see.add("group:ucetnii")  # preklep
+    window.access.see.set(["group:ucetnii"])  # preklep
 
     assert "group:ucetnii" in instance.objects.resolve(window.address, Verb.SEE)
     assert any(record.action == "unknown_principal" for record in instance.audit)
@@ -352,14 +437,14 @@ def test_an_unknown_principal_is_written_but_flagged():
 def test_a_known_principal_raises_no_flag():
     instance = vb.Instance(knows_principal=lambda name: name == "group:ucetni")
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
-    window.access.see.add("group:ucetni")
+    window.access.see.set(["group:ucetni"])
     assert not any(record.action == "unknown_principal" for record in instance.audit)
 
 
 def test_without_an_identity_source_nothing_is_flagged():
     # Zdroj identit, ktery odpovedet neumi, nesmi vyrabet varovani.
     instance, _, window = prepared()
-    window.access.see.add("group:kdokoli")
+    window.access.see.set(["group:kdokoli"])
     assert not any(record.action == "unknown_principal" for record in instance.audit)
 
 
@@ -391,3 +476,115 @@ def test_the_administrator_gets_in_even_when_nobody_opened_it():
     acl = instance.objects.resolve(Address.instance_root(), Verb.WRITE)
     assert allowed({ADMINISTRATOR}, acl)
     assert not allowed({USERS}, acl)
+
+
+# ===========================================================================
+# Vazba okna na apku (D-23, D-24, B-13)
+# ===========================================================================
+
+
+def with_hello():
+    instance = vb.Instance()
+    instance.app.register("example.hello", kind="panel")
+    return instance, instance.screen.open(id="ahoj")
+
+
+def test_window_without_an_app_holds_content_locally():
+    # Bez app= dodava obsah kod, ktery okno otevrel.
+    instance = vb.Instance()
+    window = instance.screen.open(id="ahoj").window.open("panel", id="hello")
+    assert window.app is None
+
+
+def test_documented_line_opening_a_window_bound_to_an_app():
+    # typy-oken.md par. 2b, doslova.
+    instance, screen = with_hello()
+    w = screen.window.open("panel", id="hello",
+                           title="Hello",
+                           app="example.hello")
+    assert w.app == "example.hello"
+
+
+def test_the_binding_is_made_by_whoever_opens_the_window():
+    # "Apka se na okno neprihlasuje sama. Kdyby mohla, byl by to zpusob, jak
+    # se prilepit na cizi plochu."
+    instance, screen = with_hello()
+    window = screen.window.open("panel", id="hello", app="example.hello")
+    with pytest.raises(AttributeError):
+        window.app = "nekdo.jiny"
+
+
+def test_an_app_cannot_enumerate_screens_or_windows():
+    # Zna jen ty instance, ktere dostala - zadne "vypis plochy" neexistuje.
+    instance, _ = with_hello()
+    registration = instance.app.get("example.hello")
+    for forbidden in ("screen", "window", "screens", "windows", "all"):
+        assert not hasattr(registration, forbidden), forbidden
+
+
+# -- neznama a nedostupna apka jsou dve ruzne veci (D-24) -----------------
+
+
+def test_an_app_that_is_not_registered_fails_the_open_immediately():
+    # Chyba autora se ma ozvat okamzite, ne az v provozu.
+    instance = vb.Instance()
+    screen = instance.screen.open(id="ahoj")
+    with pytest.raises(ValueError):
+        screen.window.open("panel", id="hello", app="example.helo")
+
+
+def test_the_failure_lists_what_is_registered_so_typos_are_obvious():
+    instance, screen = with_hello()
+    with pytest.raises(ValueError, match="example.hello"):
+        screen.window.open("panel", id="hello", app="example.helo")
+
+
+def test_a_failed_open_leaves_no_window_behind():
+    # Polovicne otevrene okno by bylo horsi nez zadne: mela by adresu v registru
+    # a nikdo by o nem nevedel.
+    instance, screen = with_hello()
+    with pytest.raises(ValueError):
+        screen.window.open("panel", id="hello", app="example.helo")
+    assert screen.window.all() == ()
+    assert Address.window("ahoj", "hello") not in instance.objects
+
+
+def test_binding_an_app_to_a_window_of_a_different_kind_is_refused():
+    # Apka deklaruje pri registraci, ktery renderer pouziva; okno jineho typu
+    # by jeji obsah nevykreslilo.
+    instance, screen = with_hello()
+    with pytest.raises(ValueError, match="panel"):
+        screen.window.open("graph", id="topologie", app="example.hello")
+
+
+# -- registr apek ----------------------------------------------------------
+
+
+def test_registered_apps_can_be_listed():
+    instance, _ = with_hello()
+    assert [r.app_id for r in instance.app.all()] == ["example.hello"]
+
+
+def test_the_same_app_cannot_register_twice():
+    instance, _ = with_hello()
+    with pytest.raises(ValueError):
+        instance.app.register("example.hello", kind="panel")
+
+
+def test_two_instances_have_their_own_app_registries():
+    prvni, _ = with_hello()
+    druha = vb.Instance()
+    assert druha.app.all() == ()
+
+
+def test_a_registration_keeps_what_the_document_declared():
+    instance = vb.Instance()
+    instance.app.register(
+        "example.hello",
+        kind="panel",
+        content="per-session",
+        backend_base_url="http://hello-app:8080",
+    )
+    registration = instance.app.get("example.hello")
+    assert registration.content == "per-session"
+    assert registration.backend_base_url == "http://hello-app:8080"

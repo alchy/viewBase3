@@ -26,7 +26,7 @@ from ..core.addressing import Address
 class AccessOwner(Protocol):
     """To jedine, co fasada od instance potrebuje."""
 
-    def own_acl(self, address: Address, verb: Verb) -> "Acl": ...
+    def own_acl(self, address: Address, verb: Verb) -> "Acl | None": ...
     def set_access(self, address: Address, verb: Verb, acl: "Acl") -> None: ...
     def set_step_up(self, address: Address, value: bool) -> None: ...
     def read_step_up(self, address: Address) -> bool: ...
@@ -35,10 +35,20 @@ class AccessOwner(Protocol):
 class AclView:
     """Jedno sloveso jednoho objektu.
 
-    `add` a `remove` pracuji nad ACL, ktere je na objektu NASTAVENE - ne nad
-    zdedenym. Jakmile na objektu neco stoji, prestava dedit; je to tataz
-    hranice, kterou uz ma `effective_acl` (prvni nastaveny clen retezu
-    vyhrava), jen videna z druhe strany.
+    `add` a `remove` funguji JEN na objektu, ktery uz vlastni ACL ma. Na
+    objektu, ktery dedi, skonci chybou - a je to schvalne (D-25). Kdyby `add`
+    na dedicim okne proslo, musi si vybrat mezi dvema vyklady a oba jsou
+    spatne:
+
+      * zacit od VLASTNIHO (prazdneho): okno dedici see=[users] se po
+        add("group:ucetni") stane viditelnym JEN ucetnim - slovo "pridej"
+        viditelnost zuzilo,
+      * zacit od EFEKTIVNIHO: vyjde [users, ucetni], jak ctenar ceka, ale
+        ZMRAZI SE DEDICNOST a pozdejsi uzeni plochy uz na okno nedosahne.
+
+    Druhy vyklad selhava TISE a OTEVRENE (lide vidi, co nemaji), prvni HLUCNE
+    a ZAVRENE. Nevybira se ani jeden: dvojznacnost nezmizi vykladem, zmizi
+    tim, ze se v tom miste nedá napsat.
     """
 
     __slots__ = ("_owner", "_address", "_verb")
@@ -49,22 +59,39 @@ class AclView:
         self._verb = verb
 
     def list(self) -> list[str]:
-        """Snimek. Zmena vraceneho seznamu prava neovlivni."""
-        return list(self._owner.own_acl(self._address, self._verb))
+        """Snimek toho, co na objektu STOJI. Cteni nikdy nevybuchne.
+
+        Objekt, ktery dedi, vraci prazdny seznam - ne zdedene hodnoty. Je to
+        odpoved na otazku "co jsem tady nastavil", ne "kdo to vidi".
+        """
+        own = self._owner.own_acl(self._address, self._verb)
+        return [] if own is None else list(own)
 
     def set(self, names) -> None:
+        """Dej objektu vlastni ACL. Tim mu konci dedeni - a je to videt."""
         self._owner.set_access(self._address, self._verb, Acl.from_iterable(names))
 
     def add(self, *names: str) -> None:
-        current = self._owner.own_acl(self._address, self._verb)
-        self._owner.set_access(self._address, self._verb, current.with_added(*names))
+        self._owner.set_access(self._address, self._verb, self._own().with_added(*names))
 
     def remove(self, *names: str) -> None:
-        current = self._owner.own_acl(self._address, self._verb)
-        self._owner.set_access(self._address, self._verb, current.without(*names))
+        self._owner.set_access(self._address, self._verb, self._own().without(*names))
+
+    def _own(self) -> Acl:
+        own = self._owner.own_acl(self._address, self._verb)
+        if own is None:
+            raise ValueError(
+                f"{self._address} nema vlastni ACL pro '{self._verb.value}' a dedi ho. "
+                f"add/remove by tu muselo hadat, jestli zacit od zdedeneho, nebo od "
+                f"prazdneho - a oba vyklady jsou spatne. Napis "
+                f"access.{self._verb.value}.set([...]), kdyz chces objektu dat vlastni "
+                f"ACL (dedeni tim konci), nebo zmen ACL plochy, kdyz ma zmena platit "
+                f"pro celou plochu."
+            )
+        return own
 
     def __contains__(self, name: str) -> bool:
-        return name in self._owner.own_acl(self._address, self._verb)
+        return name in self.list()
 
     def __repr__(self) -> str:  # pragma: no cover - jen pro ladeni
         return f"<access.{self._verb.value} {self.list()}>"
