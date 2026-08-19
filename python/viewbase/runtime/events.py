@@ -13,7 +13,7 @@ Dve pravidla, ktera se nesmi ohnout:
 
 2. BRANA PLOCHY A ACL OKNA SE KONTROLUJI ZVLAST (D-15). Dedicnost odpovida na
    otazku "jake ACL plati pro TENHLE objekt" - neslucuje dve urovne. Past
-   z nalezu F-09: okno se `see=[users]` a nenastavenym `write` ma efektivni
+   z nalezu F-09: okno se `read=[users]` a nenastavenym `write` ma efektivni
    ACL pro zapis [users]; kdyby se kontrolovalo jen okno, uzivatel by psal do
    okna na plose, kde smi zasahovat jen spravce.
 
@@ -43,13 +43,13 @@ class Needs(Enum):
 
         INSTANCE  sprava instance; netyka se plochy, ridi se ACL instance
         SCREEN    zasahovat do plochy (menu, otevreni okna)
-        SEE       videt plochu + videt okno
+        READ      videt plochu + videt okno
         WRITE     zasahovat do plochy + videt okno + zasahovat do okna
     """
 
     INSTANCE = "instance"
     SCREEN = "screen"
-    SEE = "see"
+    READ = "read"
     WRITE = "write"
 
 
@@ -209,7 +209,7 @@ class Guard:
 
         # 1. Brana plochy - vzdycky, jako prvni a proti ACL PLOCHY.
         #    Vidoucí udalost chce videt plochu, zasahujici do ni zasahovat.
-        gate = Verb.SEE if needs is Needs.SEE else Verb.WRITE
+        gate = Verb.READ if needs is Needs.READ else Verb.WRITE
         if not allowed(caller.principals, self.objects.resolve(screen, gate)):
             return Decision(Verdict.SCREEN_CLOSED)
 
@@ -218,7 +218,7 @@ class Guard:
 
         # 2. Az potom okno, proti ACL OKNA. Slucovat to s bodem 1 nejde:
         #    dedicnost resi jeden objekt, ne dve urovne (F-09).
-        if not allowed(caller.principals, self.objects.resolve(target, Verb.SEE)):
+        if not allowed(caller.principals, self.objects.resolve(target, Verb.READ)):
             return Decision(Verdict.NOT_IN_ACL)
         if needs is Needs.WRITE and not allowed(
             caller.principals, self.objects.resolve(target, Verb.WRITE)

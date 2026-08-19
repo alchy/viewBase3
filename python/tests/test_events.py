@@ -93,10 +93,10 @@ def full_registry() -> EventRegistry:
     registry.register("instance_shutdown", noop, needs=Needs.INSTANCE)
     registry.register("menu_select", noop, needs=Needs.SCREEN)
     registry.register("shell_new", noop, needs=Needs.SCREEN)
-    registry.register("window_focus", noop, needs=Needs.SEE)
+    registry.register("window_focus", noop, needs=Needs.READ)
     registry.register("shell_input", noop, needs=Needs.WRITE)
     registry.register("hello_submit", noop, needs=Needs.WRITE)
-    registry.register("window_unlock", noop, needs=Needs.SEE, step_up=StepUp.EXEMPT)
+    registry.register("window_unlock", noop, needs=Needs.READ, step_up=StepUp.EXEMPT)
     return registry
 
 
@@ -108,7 +108,7 @@ def test_every_registered_event_declares_what_it_needs():
 def test_no_needs_value_switches_the_check_off():
     # Chyba 3.2: `NONE` ve vyznamu "nekontroluj nic". Hodnota, ktera vypina
     # kontrolu, nema v enumu co delat - proto se testuje SEZNAM hodnot.
-    assert {member.name for member in Needs} == {"INSTANCE", "SCREEN", "SEE", "WRITE"}
+    assert {member.name for member in Needs} == {"INSTANCE", "SCREEN", "READ", "WRITE"}
 
 
 def test_only_window_unlock_may_skip_the_step_up():
@@ -124,7 +124,7 @@ def test_anonymous_on_a_hidden_screen_reaches_no_handler_at_all():
     uzivatelska udalost sly zavolat na plochu, kterou relace vubec nevidela.
     """
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of("group:ucetni"), write=Acl.of("group:ucetni")))
+    objects.add(PROVOZ, Access(read=Acl.of("group:ucetni"), write=Acl.of("group:ucetni")))
     objects.add(MZDY)
     registry = full_registry()
     guard = guard_over(objects, registry)
@@ -141,8 +141,8 @@ def test_the_invariant_test_would_notice_a_hole():
     # nektera udalost projit MUSI - jinak by test vyse prochazel i nad
     # rozbitym vynucovanim.
     objects = ObjectRegistry(default_access=Acl.of(PUBLIC))
-    objects.add(PROVOZ, Access(see=Acl.of(PUBLIC), write=Acl.of(PUBLIC)))
-    objects.add(MZDY, Access(see=Acl.of(PUBLIC), write=Acl.of(PUBLIC)))
+    objects.add(PROVOZ, Access(read=Acl.of(PUBLIC), write=Acl.of(PUBLIC)))
+    objects.add(MZDY, Access(read=Acl.of(PUBLIC), write=Acl.of(PUBLIC)))
     guard = guard_over(objects, full_registry())
     anonymous = Caller.anonymous()
 
@@ -161,7 +161,7 @@ def test_the_invariant_test_would_notice_a_hole():
 
 def test_screen_event_needs_write_on_the_screen():
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of("group:ucetni")))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of("group:ucetni")))
     registry = EventRegistry()
     registry.register("menu_select", noop, needs=Needs.SCREEN)
     guard = guard_over(objects, registry)
@@ -172,8 +172,8 @@ def test_screen_event_needs_write_on_the_screen():
 
 def test_screen_gate_applies_even_when_the_window_would_allow_it():
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of("group:ucetni")))
-    objects.add(MZDY, Access(see=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(PROVOZ, Access(read=Acl.of("group:ucetni")))
+    objects.add(MZDY, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
     registry = EventRegistry()
     registry.register("hello_submit", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)
@@ -185,13 +185,13 @@ def test_screen_gate_applies_even_when_the_window_would_allow_it():
 def test_user_cannot_write_into_a_window_on_a_screen_reserved_for_the_administrator():
     """B-10 / F-09: past, na ktere by sloucene kontroly selhaly.
 
-    Okno ma see=[users] a NEnastavene write, takze jeho efektivni ACL pro
-    zapis padne na jeho vlastni see, tedy [users]. Kdyby se kontrolovalo jen
+    Okno ma read=[users] a NEnastavene write, takze jeho efektivni ACL pro
+    zapis padne na jeho vlastni read, tedy [users]. Kdyby se kontrolovalo jen
     okno, uzivatel by prosel - pritom na plose smi zasahovat jen spravce.
     """
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of(ADMINISTRATOR)))
-    objects.add(MZDY, Access(see=Acl.of(USERS)))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(ADMINISTRATOR)))
+    objects.add(MZDY, Access(read=Acl.of(USERS)))
     registry = EventRegistry()
     registry.register("hello_submit", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)
@@ -203,24 +203,24 @@ def test_user_cannot_write_into_a_window_on_a_screen_reserved_for_the_administra
     assert decision.verdict is Verdict.SCREEN_CLOSED
 
 
-def test_see_event_needs_to_see_the_screen_and_the_window():
+def test_read_event_needs_read_on_the_screen_and_on_the_window():
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS)))
-    objects.add(MZDY, Access(see=Acl.of("group:ucetni")))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS)))
+    objects.add(MZDY, Access(read=Acl.of("group:ucetni")))
     registry = EventRegistry()
-    registry.register("window_focus", noop, needs=Needs.SEE)
+    registry.register("window_focus", noop, needs=Needs.READ)
     guard = guard_over(objects, registry)
 
     assert guard.check(Caller.for_user("hana", ["ucetni"]), "window_focus", MZDY)
     assert guard.check(Caller.for_user("petr"), "window_focus", MZDY).verdict is Verdict.NOT_IN_ACL
 
 
-def test_write_event_needs_to_see_the_window_too():
+def test_write_event_needs_read_on_the_window_too():
     # Zasahovat do neceho, co clovek nevidi, nema smysl - a rozdil mezi
     # "nevidim" a "nesmim psat" je duvod, ktery patri do auditu.
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of(USERS)))
-    objects.add(MZDY, Access(see=Acl.of("group:ucetni"), write=Acl.of(USERS)))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(MZDY, Access(read=Acl.of("group:ucetni"), write=Acl.of(USERS)))
     registry = EventRegistry()
     registry.register("hello_submit", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)
@@ -242,8 +242,8 @@ def test_three_different_causes_report_three_different_reasons():
     # Chyba 3.7: spatny kod, uz pouzity kod a zahlceni pokusy se hlasily
     # stejnou hlaskou a stalo to hodinu hledani v provozu.
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of(USERS)))
-    objects.add(MZDY, Access(see=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(MZDY, Access(read=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
     registry = EventRegistry()
     registry.register("shell_input", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)
@@ -268,12 +268,12 @@ def test_decision_is_falsy_unless_it_is_ok():
 
 def secured_setup():
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of(USERS)))
-    objects.add(MZDY, Access(see=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
-    objects.add(TAJNE, Access(see=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(MZDY, Access(read=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
+    objects.add(TAJNE, Access(read=Acl.of(USERS), write=Acl.of(USERS), step_up=True))
     registry = EventRegistry()
     registry.register("shell_input", noop, needs=Needs.WRITE)
-    registry.register("window_unlock", noop, needs=Needs.SEE, step_up=StepUp.EXEMPT)
+    registry.register("window_unlock", noop, needs=Needs.READ, step_up=StepUp.EXEMPT)
     return objects, registry
 
 
@@ -320,10 +320,10 @@ def test_the_unlocking_event_itself_does_not_need_a_grant():
 def test_the_unlocking_event_still_passes_through_the_screen_gate():
     # EXEMPT vypina krok navic, ne branu plochy.
     objects = ObjectRegistry(default_access=Acl.empty())
-    objects.add(PROVOZ, Access(see=Acl.of("group:ucetni")))
-    objects.add(MZDY, Access(see=Acl.of(USERS), step_up=True))
+    objects.add(PROVOZ, Access(read=Acl.of("group:ucetni")))
+    objects.add(MZDY, Access(read=Acl.of(USERS), step_up=True))
     registry = EventRegistry()
-    registry.register("window_unlock", noop, needs=Needs.SEE, step_up=StepUp.EXEMPT)
+    registry.register("window_unlock", noop, needs=Needs.READ, step_up=StepUp.EXEMPT)
     guard = guard_over(objects, registry)
     assert not guard.check(Caller.for_user("petr", session="s1"), "window_unlock", MZDY)
 
@@ -429,7 +429,7 @@ def test_instance_event_on_an_instance_that_registered_no_root_is_closed():
 
 def test_window_event_without_a_window_address_is_refused():
     objects = ObjectRegistry(default_access=Acl.of(USERS))
-    objects.add(PROVOZ, Access(see=Acl.of(USERS), write=Acl.of(USERS)))
+    objects.add(PROVOZ, Access(read=Acl.of(USERS), write=Acl.of(USERS)))
     registry = EventRegistry()
     registry.register("hello_submit", noop, needs=Needs.WRITE)
     guard = guard_over(objects, registry)

@@ -32,33 +32,33 @@ def resolver(table):
 
 
 def test_ref_delivers_to_someone_the_acl_allows():
-    resolve = resolver({(MZDY, Verb.SEE): Acl.of("group:ucetni")})
+    resolve = resolver({(MZDY, Verb.READ): Acl.of("group:ucetni")})
     caller = Caller.for_user("hana", ["ucetni"])
-    assert Ref(MZDY, Verb.SEE).allows(caller, resolve)
+    assert Ref(MZDY, Verb.READ).allows(caller, resolve)
 
 
 def test_ref_does_not_deliver_to_someone_outside_the_acl():
-    resolve = resolver({(MZDY, Verb.SEE): Acl.of("group:ucetni")})
-    assert not Ref(MZDY, Verb.SEE).allows(Caller.for_user("petr"), resolve)
+    resolve = resolver({(MZDY, Verb.READ): Acl.of("group:ucetni")})
+    assert not Ref(MZDY, Verb.READ).allows(Caller.for_user("petr"), resolve)
 
 
 def test_ref_asks_about_the_verb_it_was_given():
     resolve = resolver(
         {
-            (MZDY, Verb.SEE): Acl.of(PUBLIC),
+            (MZDY, Verb.READ): Acl.of(PUBLIC),
             (MZDY, Verb.WRITE): Acl.of("user:hana"),
         }
     )
     anonymous = Caller.anonymous()
-    assert Ref(MZDY, Verb.SEE).allows(anonymous, resolve)
+    assert Ref(MZDY, Verb.READ).allows(anonymous, resolve)
     assert not Ref(MZDY, Verb.WRITE).allows(anonymous, resolve)
 
 
 def test_ref_asks_about_the_address_it_was_given():
-    resolve = resolver({(LOG, Verb.SEE): Acl.of("group:auditor")})
+    resolve = resolver({(LOG, Verb.READ): Acl.of("group:auditor")})
     caller = Caller.for_user("hana", ["auditor"])
-    assert Ref(LOG, Verb.SEE).allows(caller, resolve)
-    assert not Ref(MZDY, Verb.SEE).allows(caller, resolve)
+    assert Ref(LOG, Verb.READ).allows(caller, resolve)
+    assert not Ref(MZDY, Verb.READ).allows(caller, resolve)
 
 
 # -- pozdni vazba: tohle je duvod celeho tvaru -----------------------------
@@ -68,14 +68,14 @@ def test_a_message_made_before_rights_were_taken_away_is_not_delivered_after():
     # Kdyby se mnozina principalu zmrazila pri vzniku zpravy, delta vyrobena
     # vterinu pred odebranim prav by se dorucila i po nem. Proto je pozdni
     # vazba POVINNA, ne volitelna (D-03).
-    table = {(MZDY, Verb.SEE): Acl.of("user:hana")}
+    table = {(MZDY, Verb.READ): Acl.of("user:hana")}
     resolve = resolver(table)
-    message = Message(payload={"text": "mzdy za brezen"}, audience=Ref(MZDY, Verb.SEE))
+    message = Message(payload={"text": "mzdy za brezen"}, audience=Ref(MZDY, Verb.READ))
     caller = Caller.for_user("hana")
 
     assert message.audience.allows(caller, resolve)
 
-    table[(MZDY, Verb.SEE)] = Acl.empty()  # spravce prava odebral
+    table[(MZDY, Verb.READ)] = Acl.empty()  # spravce prava odebral
 
     assert not message.audience.allows(caller, resolve)
 
@@ -83,26 +83,26 @@ def test_a_message_made_before_rights_were_taken_away_is_not_delivered_after():
 def test_narrowing_the_log_acl_applies_to_records_already_queued():
     # Tyz pripad u logu: uzeni ACL musi platit i na zaznamy, ktere uz cekaji
     # ve fronte - jinak auditni stopa odtece pres to, co je "uz vyrobene".
-    table = {(LOG, Verb.SEE): Acl.of(PUBLIC)}
+    table = {(LOG, Verb.READ): Acl.of(PUBLIC)}
     resolve = resolver(table)
-    record = Message(payload={"line": "login user:hana"}, audience=Ref(LOG, Verb.SEE))
+    record = Message(payload={"line": "login user:hana"}, audience=Ref(LOG, Verb.READ))
 
     assert record.audience.allows(Caller.anonymous(), resolve)
 
-    table[(LOG, Verb.SEE)] = Acl.of("group:auditor")
+    table[(LOG, Verb.READ)] = Acl.of("group:auditor")
 
     assert not record.audience.allows(Caller.anonymous(), resolve)
 
 
 def test_widening_an_acl_also_applies_immediately():
-    table = {(MZDY, Verb.SEE): Acl.empty()}
+    table = {(MZDY, Verb.READ): Acl.empty()}
     resolve = resolver(table)
-    reference = Ref(MZDY, Verb.SEE)
+    reference = Ref(MZDY, Verb.READ)
     caller = Caller.for_user("hana")
 
     assert not reference.allows(caller, resolve)
 
-    table[(MZDY, Verb.SEE)] = Acl.of(USERS)
+    table[(MZDY, Verb.READ)] = Acl.of(USERS)
 
     assert reference.allows(caller, resolve)
 
@@ -139,22 +139,22 @@ def test_session_audience_does_not_consult_the_acl_at_all():
 
 
 def test_and_needs_both_parts():
-    resolve = resolver({(MZDY, Verb.SEE): Acl.of("user:hana")})
+    resolve = resolver({(MZDY, Verb.READ): Acl.of("user:hana")})
     caller = Caller.for_user("hana", session="s1")
-    assert And(Session("s1"), Ref(MZDY, Verb.SEE)).allows(caller, resolve)
+    assert And(Session("s1"), Ref(MZDY, Verb.READ)).allows(caller, resolve)
 
 
 def test_and_denies_when_the_acl_half_fails():
     # "Odpoved mne, ale jen kdyz na to mam": spravna relace, chybejici pravo.
-    resolve = resolver({(MZDY, Verb.SEE): Acl.empty()})
+    resolve = resolver({(MZDY, Verb.READ): Acl.empty()})
     caller = Caller.for_user("hana", session="s1")
-    assert not And(Session("s1"), Ref(MZDY, Verb.SEE)).allows(caller, resolve)
+    assert not And(Session("s1"), Ref(MZDY, Verb.READ)).allows(caller, resolve)
 
 
 def test_and_denies_when_the_session_half_fails():
-    resolve = resolver({(MZDY, Verb.SEE): Acl.of("user:hana")})
+    resolve = resolver({(MZDY, Verb.READ): Acl.of("user:hana")})
     caller = Caller.for_user("hana", session="s2")
-    assert not And(Session("s1"), Ref(MZDY, Verb.SEE)).allows(caller, resolve)
+    assert not And(Session("s1"), Ref(MZDY, Verb.READ)).allows(caller, resolve)
 
 
 # -- zprava bez publika nesmi jit vyrobit ----------------------------------

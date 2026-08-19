@@ -113,7 +113,7 @@ class Window:
 
         instance = self._instance
         capabilities = []
-        if instance.guard.may(caller, Needs.SEE, self.address):
+        if instance.guard.may(caller, Needs.READ, self.address):
             capabilities.append("read")
         if instance.guard.may(caller, Needs.WRITE, self.address):
             capabilities.append("write")
@@ -144,7 +144,7 @@ class Window:
         from .events import Needs
 
         instance = self._instance
-        if not instance.guard.may(caller, Needs.SEE, self.address):
+        if not instance.guard.may(caller, Needs.READ, self.address):
             return []
 
         groups = []

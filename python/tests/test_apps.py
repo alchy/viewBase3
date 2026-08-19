@@ -7,7 +7,7 @@ import viewbase as vb
 from viewbase.core.access import Acl, Verb
 from viewbase.core.addressing import Address
 from viewbase.core.identity import ADMINISTRATOR, USERS, Caller
-from viewbase.runtime.content import ContentRefused, ContentState
+from viewbase.runtime.content import ContentState
 
 
 class FakeApp:
@@ -19,11 +19,8 @@ class FakeApp:
 
     def open_content(self, handle, spec, subject):
         self.subjects.append(subject)
-        if handle is None:  # apka si rukojet razi sama
-            handle = "app_minted_1"
-            self.known.add(handle)
-        elif handle not in self.known:
-            raise ContentRefused(f"rukojet {handle} neznam")
+        handle = handle or "app_minted_1"  # apka si rukojet razi sama
+        self.known.add(handle)
         self.opened.append(handle)
         return {"handle": handle, "state": {}, "cursor": 1}
 
@@ -35,10 +32,6 @@ class FakeApp:
 
     def close_content(self, handle):
         self.known.discard(handle)
-
-    def list_content(self, subject):
-        self.subjects.append(subject)
-        return self.listing
 
 
 class OpenApp(FakeApp):
@@ -72,32 +65,32 @@ def test_registering_an_app_puts_it_in_the_object_registry():
 
 def test_an_app_can_be_hidden_from_most_people():
     instance = instance_with()
-    instance.app.get("workbench.graph").access.see.set(["group:ucetni"])
-    acl = instance.objects.resolve(Address.app("workbench.graph"), Verb.SEE)
+    instance.app.get("workbench.graph").access.read.set(["group:ucetni"])
+    acl = instance.objects.resolve(Address.app("workbench.graph"), Verb.READ)
     assert acl == Acl.of("group:ucetni")
 
 
-def test_the_launcher_shows_only_apps_the_viewer_may_see():
+def test_the_launcher_shows_only_apps_the_viewer_may_read():
     # Spoustec je vec WORKBENCHE - stavi ho z registru apek a filtruje nasim
     # modelem. Apka do nej nic nevklada.
     instance = instance_with()
     instance.app.register("tajna", kind="panel", scope="app", backend=OpenApp())
-    instance.app.get("tajna").access.see.set(["group:ucetni"])
+    instance.app.get("tajna").access.read.set(["group:ucetni"])
 
     visible = {r.app_id for r in instance.app.visible_to(Caller.for_user("petr"))}
     assert visible == {"workbench.graph"}
 
 
-def test_the_launcher_shows_the_hidden_app_to_those_who_may_see_it():
+def test_the_launcher_shows_the_hidden_app_to_those_who_may_read_it():
     instance = instance_with()
-    instance.app.get("workbench.graph").access.see.set(["group:ucetni"])
+    instance.app.get("workbench.graph").access.read.set(["group:ucetni"])
     visible = instance.app.visible_to(Caller.for_user("hana", ["ucetni"]))
     assert [r.app_id for r in visible] == ["workbench.graph"]
 
 
 def test_the_administrator_sees_every_app():
     instance = instance_with()
-    instance.app.get("workbench.graph").access.see.set([])
+    instance.app.get("workbench.graph").access.read.set([])
     visible = instance.app.visible_to(Caller.for_user("spravce", ["administrator"]))
     assert [r.app_id for r in visible] == ["workbench.graph"]
 
@@ -234,53 +227,18 @@ def test_an_app_event_obeys_the_registry_invariant():
 
 
 # ===========================================================================
-# Pripojeni k obsahu: subjekt a odmitnuti (D-38, D-39)
+# Pripojeni k obsahu (D-38, D-39)
+#
+# ODMITANI ZANIKLO (D-52): apka o pravech nerozhoduje nic - obsah ma vlastni
+# adresu a vlastni ACL a rozhodujeme my. Autor apky tim nema CO pokazit.
 # ===========================================================================
 
 
 def test_open_content_gets_the_subject():
-    # Bez subjektu plati "kdo zna rukojet, dostane obsah" - a to rusi vetu
-    # "rukojet identifikuje, neopravnuje".
     backend = OpenApp()
     instance = instance_with(backend)
     instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
     assert "subject_id" in backend.subjects[-1]
-
-
-def test_an_app_may_refuse_the_connection():
-    backend = FakeApp(known=())  # nezna zadnou rukojet
-    instance = instance_with(backend)
-    w = instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
-    assert w.content_state is ContentState.REFUSED
-
-
-def test_a_refusal_is_not_the_same_as_an_outage():
-    # Odmitnuti je normalni odpoved, ne chyba - a ram ma rict neco jineho.
-    backend = FakeApp(known=())
-    instance = instance_with(backend)
-    w = instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
-    assert w.content_state is not ContentState.UNAVAILABLE
-
-
-def test_an_unknown_handle_is_refused_never_silently_created():
-    # Tiche zalozeni by po preklepu dalo divakovi prazdny obsah a on si mysli,
-    # ze prisel o data.
-    backend = FakeApp(known={"vb1_znama"})
-    instance = instance_with(backend)
-    w = instance.screen.open(id="infra").window.open(
-        "graph", id="net", app="workbench.graph", handle="vb1_preklep"
-    )
-    assert w.content_state is ContentState.REFUSED
-    assert backend.opened == []
-
-
-def test_a_known_handle_is_attached():
-    backend = FakeApp(known={"vb1_znama"})
-    instance = instance_with(backend)
-    w = instance.screen.open(id="infra").window.open(
-        "graph", id="net", app="workbench.graph", handle="vb1_znama"
-    )
-    assert w.content_state is ContentState.OK
 
 
 def test_the_app_may_mint_the_handle_itself():
@@ -292,40 +250,29 @@ def test_the_app_may_mint_the_handle_itself():
     assert handle == "app_minted_1"
 
 
-def test_a_refused_content_is_written_to_the_audit():
-    instance = instance_with(FakeApp(known=()))
-    instance.screen.open(id="infra").window.open("graph", id="net", app="workbench.graph")
-    assert any(r.action == "content_refused" for r in instance.audit)
+def test_the_app_can_no_longer_refuse_a_connection():
+    # Strojova kontrola skrtu: kdyby se ta cesta vratila, vratila by se s ni
+    # i moznost, ze o pravech rozhoduje apka.
+    import viewbase.runtime.content as content_module
+
+    assert not hasattr(content_module, "ContentRefused")
+    assert not hasattr(content_module.ContentState, "REFUSED")
+
+
+def test_the_app_contract_no_longer_lists_content():
+    import inspect
+
+    from viewbase.runtime.content import AppBackend
+
+    assert not hasattr(AppBackend, "list_content")
+    assert list(inspect.signature(AppBackend.open_content).parameters) == [
+        "self", "handle", "spec", "subject",
+    ]
 
 
 # ===========================================================================
-# Vyber obsahu ze seznamu (D-37) a jeho vlastnik (D-41)
+# Vlastnik obsahu (D-41, D-50)
 # ===========================================================================
-
-
-def test_the_app_lists_what_the_viewer_may_pick():
-    backend = OpenApp()
-    backend.listing = [{"handle": "vb1_a", "name": "Graph #1", "last_used_at": 1}]
-    instance = instance_with(backend)
-    listed = instance.app.get("workbench.graph").list_content(Caller.for_user("hana"))
-    assert listed[0]["name"] == "Graph #1"
-
-
-def test_listing_passes_the_subject_so_the_app_can_filter():
-    # Vlastnictvi obsahu jsou data APKY; my rozhodujeme o oknech.
-    backend = OpenApp()
-    instance = instance_with(backend)
-    instance.app.get("workbench.graph").list_content(Caller.for_user("hana"))
-    assert backend.subjects[-1]["subject_id"] == "user:hana"
-
-
-def test_listing_from_a_broken_app_is_an_empty_list_not_a_crash():
-    class Dead(OpenApp):
-        def list_content(self, subject):
-            raise ConnectionError("spadla")
-
-    instance = instance_with(Dead())
-    assert instance.app.get("workbench.graph").list_content(Caller.for_user("hana")) == []
 
 
 def test_content_records_who_created_it():
@@ -343,9 +290,9 @@ def test_the_creator_is_the_caller_who_opened_it():
     assert instance.content.created_by(w.app.handle) == "user:hana"
 
 
-def test_a_destructive_action_is_for_the_owner_or_the_administrator():
-    # Jeden obsah muze byt ve dvou oknech s ruznymi ACL (D-30). Bez vlastnika
-    # by pravo psat v jednom okne znamenalo pravo znicit obsah videny v druhem.
+def test_a_destructive_action_is_for_the_founder_or_the_administrator():
+    # D-50: prejmenovat, zrusit a menit prava smi ZAKLADATEL objektu nebo
+    # spravce - odvozene, ne deklarovane. V ACL zadne 'manage' neni.
     instance = instance_with()
     screen = instance.screen.open(id="infra")
     w = screen.window.open(

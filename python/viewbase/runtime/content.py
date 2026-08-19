@@ -56,22 +56,11 @@ SERVICE_SUBJECT = "service:instance"
 DEFAULT_TIMEOUTS = {"open_content": 2.0, "snapshot": 2.0, "apply_event": 5.0}
 
 
-class ContentRefused(Exception):
-    """Apka pripojeni k obsahu ODMITLA.
-
-    Je to NORMALNI ODPOVED, ne chyba: neznama rukojet, cizi obsah, vycerpany
-    limit. Divak dostane ram s hlaskou. Odlisuje se od vypadku zamerne -
-    "neznam tuhle rukojet" a "spadl mi kontejner" jsou dve ruzne veci a
-    divakovi se maji rict jinak (par. 8: kazde rozhodnuti vraci duvod).
-    """
-
-
 class ContentState(Enum):
     """Stav obsahu z pohledu INSTANCE - apka o nem z definice nemuze rict nic."""
 
     OK = "ok"
     UNAVAILABLE = "unavailable"  # spadla, restartuje se, nebo neodpovida vcas
-    REFUSED = "refused"  # apka pripojeni odmitla; je to odpoved, ne porucha
 
 
 class AppBackend(Protocol):
@@ -80,13 +69,17 @@ class AppBackend(Protocol):
     Mapu okno -> rukojet drzi instance; apka resi jen svuj obsah. Hranice je
     tim ostrejsi, ne volnejsi - a apka se stava pouzitelnou i tam, kde zadna
     okna nejsou.
+
+    APKA O PRAVECH NEROZHODUJE NIC (D-52). Drive tu byl `list_content`
+    filtrovany apkou a moznost pripojeni odmitnout; oboji
+    zaniklo, protoze prava obsahu se prestehovala k nam - obsah ma vlastni
+    adresu a vlastni ACL. Autor apky tim nema CO pokazit.
     """
 
     def open_content(self, handle: str | None, spec: dict, subject: dict) -> dict: ...
     def snapshot(self, handle: str, subject: dict) -> dict: ...
     def apply_event(self, handle: str, subject: dict, event: dict) -> list: ...
     def close_content(self, handle: str) -> None: ...
-    def list_content(self, subject: dict) -> list: ...
 
 
 @dataclass
@@ -288,21 +281,6 @@ class ContentRegistry:
             content, "snapshot", backend.snapshot, handle, subject_of(caller, capabilities)
         )
 
-    def list_content(self, app_id: str, caller: Caller) -> list:
-        """Z ceho si divak muze vybrat (D-37).
-
-        Filtruje APKA - vlastnictvi obsahu jsou jeji data; my rozhodujeme
-        o oknech. Spadla apka da prazdny seznam, ne vyjimku: spoustec se kvuli
-        jedne mrtve apce nesmi rozbit.
-        """
-        backend = self._backends.get(app_id)
-        if backend is None or not hasattr(backend, "list_content"):
-            return []
-        placeholder = Content("-", app_id)
-        result = self._call(
-            placeholder, "snapshot", backend.list_content, subject_of(caller)
-        )
-        return result or []
 
     def _open_at_app(
         self, handle: str | None, app_id: str, spec: dict, caller: Caller
@@ -336,20 +314,6 @@ class ContentRegistry:
             result = self._pool.submit(fn, *args).result(self._timeouts.get(what, 2.0))
         except FutureTimeout:
             self._mark_unavailable(content, what, "neodpovedela vcas")
-            return None
-        except ContentRefused as refusal:
-            # Odmitnuti je odpoved, ne porucha - a divakovi se rika jinak.
-            #
-            # Do stopy jde ale jako BEZPECNOSTNI zaznam: pokus sahnout na cizi
-            # obsah je presne to, co chce spravce videt i na instanci bezici
-            # s log_level='error'. Ve viewBase2 to znelo "access to window
-            # refused" a bylo to auditni.
-            content.state = ContentState.REFUSED
-            self._audit(
-                "content", "content_refused",
-                detail=f"{content.app_id} {what}: {refusal}",
-                security=True,
-            )
             return None
         except Exception as problem:  # apka je cizi kod; nesmi shodit instanci
             self._mark_unavailable(content, what, f"{type(problem).__name__}: {problem}")

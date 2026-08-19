@@ -26,8 +26,8 @@ def registry(default=Acl.of(USERS)):
 
 def test_registered_object_can_be_found():
     reg = registry()
-    reg.add(PROVOZ, Access(see=Acl.of("group:ucetni")))
-    assert reg.access_of(PROVOZ) == Access(see=Acl.of("group:ucetni"))
+    reg.add(PROVOZ, Access(read=Acl.of("group:ucetni")))
+    assert reg.access_of(PROVOZ) == Access(read=Acl.of("group:ucetni"))
 
 
 def test_object_registers_without_explicit_access():
@@ -62,29 +62,29 @@ def test_removed_object_is_gone():
 
 def test_window_with_its_own_acl_does_not_inherit():
     reg = registry()
-    reg.add(PROVOZ, Access(see=Acl.of(USERS)))
-    reg.add(MZDY, Access(see=Acl.of("group:ucetni")))
-    assert reg.resolve(MZDY, Verb.SEE) == Acl.of("group:ucetni")
+    reg.add(PROVOZ, Access(read=Acl.of(USERS)))
+    reg.add(MZDY, Access(read=Acl.of("group:ucetni")))
+    assert reg.resolve(MZDY, Verb.READ) == Acl.of("group:ucetni")
 
 
 def test_window_without_acl_inherits_from_its_screen():
     reg = registry()
-    reg.add(PROVOZ, Access(see=Acl.of("group:ucetni")))
+    reg.add(PROVOZ, Access(read=Acl.of("group:ucetni")))
     reg.add(MZDY)
-    assert reg.resolve(MZDY, Verb.SEE) == Acl.of("group:ucetni")
+    assert reg.resolve(MZDY, Verb.READ) == Acl.of("group:ucetni")
 
 
 def test_window_and_screen_without_acl_fall_to_the_instance_default():
     reg = registry(default=Acl.of(USERS))
     reg.add(PROVOZ)
     reg.add(MZDY)
-    assert reg.resolve(MZDY, Verb.SEE) == Acl.of(USERS)
+    assert reg.resolve(MZDY, Verb.READ) == Acl.of(USERS)
 
 
-def test_unset_write_falls_back_to_see_on_the_same_object():
+def test_unset_write_falls_back_to_read_on_the_same_object():
     reg = registry()
     reg.add(PROVOZ)
-    reg.add(MZDY, Access(see=Acl.of(USERS)))
+    reg.add(MZDY, Access(read=Acl.of(USERS)))
     assert reg.resolve(MZDY, Verb.WRITE) == Acl.of(USERS)
 
 
@@ -93,17 +93,17 @@ def test_instance_object_does_not_inherit_from_any_screen():
     # lezi okno, publikuje ji prvni verejna plocha (chyba 3.4).
     reg = registry(default=Acl.empty())
     reg.add(Address.instance_root())
-    reg.add(PROVOZ, Access(see=Acl.of("group:public")))
-    reg.add(LOG, Access(see=Acl.of("group:auditor")))
-    assert reg.resolve(LOG, Verb.SEE) == Acl.of("group:auditor")
+    reg.add(PROVOZ, Access(read=Acl.of("group:public")))
+    reg.add(LOG, Access(read=Acl.of("group:auditor")))
+    assert reg.resolve(LOG, Verb.READ) == Acl.of("group:auditor")
 
 
 def test_instance_object_without_acl_does_not_take_anything_from_a_screen():
     reg = registry(default=Acl.of(USERS))
     reg.add(Address.instance_root())
-    reg.add(PROVOZ, Access(see=Acl.of("group:public")))
+    reg.add(PROVOZ, Access(read=Acl.of("group:public")))
     reg.add(LOG)
-    assert reg.resolve(LOG, Verb.SEE) == Acl.empty()
+    assert reg.resolve(LOG, Verb.READ) == Acl.empty()
 
 
 # -- bezpecne chovani u zmizeleho objektu ----------------------------------
@@ -112,7 +112,7 @@ def test_instance_object_without_acl_does_not_take_anything_from_a_screen():
 def test_resolving_an_unknown_address_is_closed_not_open():
     # Zprava muze dorazit k doruceni pote, co okno zaniklo. "Neznam" nesmi
     # znamenat "vychozi", natoz "kdokoli" (chyba 3.5).
-    assert registry(default=Acl.of(USERS)).resolve(MZDY, Verb.SEE) == Acl.empty()
+    assert registry(default=Acl.of(USERS)).resolve(MZDY, Verb.READ) == Acl.empty()
 
 
 def test_window_whose_screen_disappeared_is_closed():
@@ -120,7 +120,7 @@ def test_window_whose_screen_disappeared_is_closed():
     reg.add(PROVOZ)
     reg.add(MZDY)
     reg.remove(PROVOZ)
-    assert reg.resolve(MZDY, Verb.SEE) == Acl.empty()
+    assert reg.resolve(MZDY, Verb.READ) == Acl.empty()
 
 
 # -- krok navic je vlastnost objektu, dotaz na nej je vlastni otazka -------
@@ -153,9 +153,9 @@ ROOT = Address.instance_root()
 
 def test_instance_object_inherits_from_the_instance_itself():
     reg = registry(default=Acl.of(USERS))
-    reg.add(ROOT, Access(see=Acl.of("group:auditor"), write=Acl.of(ADMINISTRATOR)))
+    reg.add(ROOT, Access(read=Acl.of("group:auditor"), write=Acl.of(ADMINISTRATOR)))
     reg.add(LOG)
-    assert reg.resolve(LOG, Verb.SEE) == Acl.of("group:auditor")
+    assert reg.resolve(LOG, Verb.READ) == Acl.of("group:auditor")
 
 
 def test_instance_object_never_falls_to_the_instance_default():
@@ -165,7 +165,7 @@ def test_instance_object_never_falls_to_the_instance_default():
     reg = registry(default=Acl.of(USERS))
     reg.add(ROOT)
     reg.add(LOG)
-    assert reg.resolve(LOG, Verb.SEE) == Acl.empty()
+    assert reg.resolve(LOG, Verb.READ) == Acl.empty()
 
 
 def test_the_instance_itself_is_closed_when_nobody_set_it():
@@ -181,7 +181,7 @@ def test_screens_still_fall_to_the_instance_default():
     # instance-wide objekt bere zavreno.
     reg = registry(default=Acl.of(USERS))
     reg.add(PROVOZ)
-    assert reg.resolve(PROVOZ, Verb.SEE) == Acl.of(USERS)
+    assert reg.resolve(PROVOZ, Verb.READ) == Acl.of(USERS)
 
 
 def test_app_registrations_fall_to_the_instance_default_like_screens():
@@ -189,10 +189,10 @@ def test_app_registrations_fall_to_the_instance_default_like_screens():
     # koncila zavreno, neuvidi cerstve nasazena instance zadnou apku.
     reg = registry(default=Acl.of(USERS))
     reg.add(Address.app("example.hello"))
-    assert reg.resolve(Address.app("example.hello"), Verb.SEE) == Acl.of(USERS)
+    assert reg.resolve(Address.app("example.hello"), Verb.READ) == Acl.of(USERS)
 
 
 def test_an_app_can_still_be_hidden_by_its_own_acl():
     reg = registry(default=Acl.of(USERS))
-    reg.add(Address.app("example.hello"), Access(see=Acl.of("group:ucetni")))
-    assert reg.resolve(Address.app("example.hello"), Verb.SEE) == Acl.of("group:ucetni")
+    reg.add(Address.app("example.hello"), Access(read=Acl.of("group:ucetni")))
+    assert reg.resolve(Address.app("example.hello"), Verb.READ) == Acl.of("group:ucetni")

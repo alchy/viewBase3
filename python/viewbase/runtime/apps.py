@@ -80,10 +80,6 @@ class AppRegistration:
         assert self._content is not None
         self._content.close(handle)
 
-    def list_content(self, caller: Caller) -> list:
-        """Z ceho si divak muze vybrat (D-37). Filtruje apka, ne my."""
-        assert self._content is not None
-        return self._content.list_content(self.app_id, caller)
 
 
 def new_handle_seed() -> str:
@@ -176,7 +172,7 @@ class AppCollection:
             for registration in self._registrations.values()
             if allowed(
                 caller.principals,
-                self._instance.objects.resolve(registration.address, Verb.SEE),
+                self._instance.objects.resolve(registration.address, Verb.READ),
             )
         )
 

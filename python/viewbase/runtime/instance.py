@@ -90,7 +90,7 @@ class Instance:
         instance = vb.Instance()
         screen = instance.screen.open(title="Provoz", id="provoz")
         window = screen.window.open("panel", id="mzdy", title="Mzdy")
-        window.access.see.add("group:ucetni")
+        window.access.read.add("group:ucetni")
 
     `default_access` plati pro plochy a okna, ktera zadne ACL nemaji.
     `admin_access` je ACL pro spravu instance a je VYCHOZE ZAVRENE - dostane
@@ -152,11 +152,11 @@ class Instance:
         """ACL NASTAVENE primo na objektu, nebo None, kdyz se dedi.
 
         Zamerne se NEPTA pres `for_verb`: ten u nenastaveneho `write` padne na
-        `see`, coz je spravne pro CTENI prav, ale tady by to znamenalo, ze
-        `write.add()` tise zmrazi hodnotu prectenou ze `see`.
+        `read`, coz je spravne pro CTENI prav, ale tady by to znamenalo, ze
+        `write.add()` tise zmrazi hodnotu prectenou z `read`.
         """
         access = self.objects.access_of(address)
-        return access.see if verb is Verb.SEE else access.write
+        return access.read if verb is Verb.READ else access.write
 
     def set_access(self, address: Address, verb: Verb, new: Acl) -> None:
         """Zmen ACL objektu a zapis o tom auditni zaznam.
@@ -169,9 +169,9 @@ class Instance:
 
         current = self.objects.access_of(address)
         replacement = (
-            Access(see=new, write=current.write, step_up=current.step_up)
-            if verb is Verb.SEE
-            else Access(see=current.see, write=new, step_up=current.step_up)
+            Access(read=new, write=current.write, step_up=current.step_up)
+            if verb is Verb.READ
+            else Access(read=current.read, write=new, step_up=current.step_up)
         )
         self.objects.replace_access(address, replacement)
         self._security(verb.value, address, verb, ", ".join(sorted(new)))
@@ -179,7 +179,7 @@ class Instance:
     def set_step_up(self, address: Address, value: bool) -> None:
         current = self.objects.access_of(address)
         self.objects.replace_access(
-            address, Access(see=current.see, write=current.write, step_up=value)
+            address, Access(read=current.read, write=current.write, step_up=value)
         )
         self._security("require_authentication", address, None, str(value).lower())
 

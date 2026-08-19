@@ -207,12 +207,12 @@ def test_two_windows_on_one_content_keep_their_own_access():
     verejne = screen.window.open("graph", id="net", app="workbench.graph")
     tajne = screen.window.open("graph", id="net2", app="workbench.graph")
 
-    verejne.access.see.set(["group:public"])
-    tajne.access.see.set(["group:ucetni"])
+    verejne.access.read.set(["group:public"])
+    tajne.access.read.set(["group:ucetni"])
 
     assert verejne.app.handle == tajne.app.handle
-    assert instance.objects.resolve(verejne.address, vb.Verb.SEE) != instance.objects.resolve(
-        tajne.address, vb.Verb.SEE
+    assert instance.objects.resolve(verejne.address, vb.Verb.READ) != instance.objects.resolve(
+        tajne.address, vb.Verb.READ
     )
 
 
@@ -288,8 +288,8 @@ def test_the_subject_carries_no_session_id_and_no_groups():
     w = screen.window.open("graph", id="net", app="workbench.graph")
     caller = Caller.for_user("hana", ["ucetni"], session="s1", correlation="c9f1")
 
-    w.access.see.set(["group:users"])
-    screen.access.see.set(["group:users"])
+    w.access.read.set(["group:users"])
+    screen.access.read.set(["group:users"])
     backend.subjects.clear()
     w.snapshot_for(caller)
 
@@ -311,8 +311,8 @@ def test_an_anonymous_caller_is_anonymous_to_the_app_too():
     backend = FakeApp()
     instance, screen = with_graph(backend=backend)
     w = screen.window.open("graph", id="net", app="workbench.graph")
-    screen.access.see.set(["group:public"])
-    w.access.see.set(["group:public"])
+    screen.access.read.set(["group:public"])
+    w.access.read.set(["group:public"])
     w.snapshot_for(Caller.anonymous())
     assert backend.subjects[-1]["subject_id"] == "anonymous"
 
@@ -321,8 +321,8 @@ def test_the_snapshot_carries_a_cursor():
     # Bez kurzoru se delta bud ztrati, nebo pouzije dvakrat (D-31).
     instance, screen = with_graph(backend=FakeApp(cursor=271))
     w = screen.window.open("graph", id="net", app="workbench.graph")
-    screen.access.see.set(["group:public"])
-    w.access.see.set(["group:public"])
+    screen.access.read.set(["group:public"])
+    w.access.read.set(["group:public"])
     assert w.snapshot_for(Caller.anonymous())["cursor"] == 271
 
 
@@ -388,6 +388,6 @@ def test_asking_a_broken_app_for_a_snapshot_does_not_raise():
     # Vypadek je STAV OKNA, ne chyba: divak vidi ram, ostatni okna bezi dal.
     instance, screen = with_graph(backend=BrokenApp())
     w = screen.window.open("graph", id="net", app="workbench.graph")
-    screen.access.see.set(["group:public"])
-    w.access.see.set(["group:public"])
+    screen.access.read.set(["group:public"])
+    w.access.read.set(["group:public"])
     assert w.snapshot_for(Caller.anonymous()) is None

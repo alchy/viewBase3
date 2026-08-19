@@ -5,7 +5,7 @@
     instance = vb.Instance()
     screen = instance.screen.open(title="Provoz", id="provoz")
     window = screen.window.open("panel", id="mzdy", title="Mzdy")
-    window.access.see.add("group:ucetni")
+    window.access.read.add("group:ucetni")
 
 VEREJNE JE JEN TO, CO VYVOJAR PISE (D-13): `Instance` a enumy, ktere se
 jmenuji pri registraci udalosti. Vsechno ostatni se ziskava Z INSTANCE, ne

@@ -260,13 +260,13 @@ def test_a_change_of_rights_survives_the_strictest_threshold():
     # "Kdo co komu otevrel" musi jit dohledat i na instanci, ktera bezi
     # s log_level='error'. Tohle je to pravidlo v praxi.
     instance, window = instance_at("error")
-    window.access.see.set(["group:ucetni"])
-    assert any(r.action == "see" for r in instance.audit)
+    window.access.read.set(["group:ucetni"])
+    assert any(r.action == "read" for r in instance.audit)
 
 
 def test_the_change_is_marked_as_a_security_record():
     instance, window = instance_at("info")
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert instance.audit[-1].component == SECURITY
 
 
@@ -276,7 +276,7 @@ def test_an_ordinary_record_obeys_the_threshold():
 
     instance = vb.Instance(log_level="error", knows_principal=lambda name: False)
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
-    window.access.see.set(["group:neznama"])
+    window.access.read.set(["group:neznama"])
     assert not any(r.action == "unknown_principal" for r in instance.audit)
 
 
@@ -285,7 +285,7 @@ def test_the_same_record_passes_at_a_lower_threshold():
 
     instance = vb.Instance(log_level="info", knows_principal=lambda name: False)
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
-    window.access.see.set(["group:neznama"])
+    window.access.read.set(["group:neznama"])
     assert any(r.action == "unknown_principal" for r in instance.audit)
 
 
@@ -293,13 +293,13 @@ def test_a_forged_line_cannot_enter_the_trail_through_a_principal_name():
     # Jmeno principala je vstup od cloveka a tece do stopy - takze i tudy
     # musi projit sanaci.
     instance, window = instance_at("info")
-    window.access.see.set(["group:a\nfalesny radek"])
+    window.access.read.set(["group:a\nfalesny radek"])
     assert all("\n" not in (r.detail or "") for r in instance.audit)
 
 
 def test_every_record_from_the_instance_says_who_did_it():
     instance, window = instance_at("info")
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert all(r.by for r in instance.audit)
 
 
@@ -330,34 +330,6 @@ def test_the_pure_half_of_the_audit_needs_nothing_from_the_runtime():
         text=True,
     )
     assert done.returncode == 0, done.stderr
-
-
-def test_a_refused_access_to_content_survives_the_strictest_threshold():
-    # Pokus sahnout na cizi obsah je presne to, co chce spravce videt
-    # i na instanci bezici s log_level='error'.
-    import viewbase as vb
-    from viewbase.runtime.content import ContentRefused
-
-    class Odmitava:
-        def open_content(self, handle, spec, subject):
-            raise ContentRefused("tenhle obsah ti nedam")
-
-        def snapshot(self, handle, subject):
-            raise ContentRefused("tenhle obsah ti nedam")
-
-        def apply_event(self, handle, subject, event):
-            return []
-
-        def close_content(self, handle):
-            pass
-
-    instance = vb.Instance(log_level="error")
-    instance.app.register("a", kind="graph", scope="app", backend=Odmitava())
-    instance.screen.open(id="infra").window.open("graph", id="net", app="a")
-
-    refusals = [r for r in instance.audit if r.action == "content_refused"]
-    assert refusals
-    assert refusals[0].component == SECURITY
 
 
 def test_an_unavailable_content_stays_an_ordinary_record():

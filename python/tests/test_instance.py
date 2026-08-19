@@ -226,8 +226,8 @@ def test_two_instances_can_have_different_defaults():
     zavrena = vb.Instance(default_access=[])
     otevrena.screen.open(id="provoz")
     zavrena.screen.open(id="provoz")
-    assert otevrena.objects.resolve(Address.screen("provoz"), Verb.SEE) == Acl.of("group:public")
-    assert zavrena.objects.resolve(Address.screen("provoz"), Verb.SEE) == Acl.empty()
+    assert otevrena.objects.resolve(Address.screen("provoz"), Verb.READ) == Acl.of("group:public")
+    assert zavrena.objects.resolve(Address.screen("provoz"), Verb.READ) == Acl.empty()
 
 
 def test_a_test_does_not_have_to_reset_anything():
@@ -257,23 +257,23 @@ def test_documented_lines_from_the_docs_verbatim():
     """
     instance, _, window = prepared()
 
-    window.access.see.set(["group:ucetni"])       # vlastni ACL okna; konci dedeni
-    window.access.see.add("user:hana")            # ...a jeste konkretni clovek
+    window.access.read.set(["group:ucetni"])       # vlastni ACL okna; konci dedeni
+    window.access.read.add("user:hana")            # ...a jeste konkretni clovek
     window.access.write.set(["user:hana"])
     window.access.require_authentication = True
 
-    assert instance.objects.resolve(window.address, Verb.SEE) == Acl.of(
+    assert instance.objects.resolve(window.address, Verb.READ) == Acl.of(
         "group:ucetni", "user:hana"
     )
     assert instance.objects.resolve(window.address, Verb.WRITE) == Acl.of("user:hana")
     assert instance.objects.step_up_at(window.address) is True
 
 
-def test_documented_line_window_access_see_list():
+def test_documented_line_window_access_read_list():
     # architektura-navrh.md par. 4b, doslova.
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
-    assert window.access.see.list() == ["group:ucetni"]
+    window.access.read.set(["group:ucetni"])
+    assert window.access.read.list() == ["group:ucetni"]
 
 
 # -- add/remove na dedicim objektu skonci chybou s navodem (D-25) ----------
@@ -284,40 +284,40 @@ def test_add_on_an_inheriting_window_is_refused():
     # zmizi tam, kde by kousla.
     _, _, window = prepared()
     with pytest.raises(ValueError):
-        window.access.see.add("group:ucetni")
+        window.access.read.add("group:ucetni")
 
 
 def test_the_refusal_says_what_to_do_instead():
     # Chyba bez navodu je jen jina podoba te same pasti.
     _, _, window = prepared()
     with pytest.raises(ValueError, match="set"):
-        window.access.see.add("group:ucetni")
+        window.access.read.add("group:ucetni")
 
 
 def test_remove_on_an_inheriting_window_is_refused_too():
     _, _, window = prepared()
     with pytest.raises(ValueError):
-        window.access.see.remove("group:public")
+        window.access.read.remove("group:public")
 
 
 def test_set_always_works_because_it_says_what_it_does():
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
-    assert window.access.see.list() == ["group:ucetni"]
+    window.access.read.set(["group:ucetni"])
+    assert window.access.read.list() == ["group:ucetni"]
 
 
 def test_add_works_once_the_object_has_its_own_acl():
     instance, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
-    window.access.see.add("user:hana")
-    assert "user:hana" in instance.objects.resolve(window.address, Verb.SEE)
+    window.access.read.set(["group:ucetni"])
+    window.access.read.add("user:hana")
+    assert "user:hana" in instance.objects.resolve(window.address, Verb.READ)
 
 
-def test_setting_see_does_not_make_write_settable_by_add():
-    # `write` nenastavene padne pri CTENI na `see`, ale vlastni ACL to neni -
-    # jinak by `write.add()` tise zmrazilo hodnotu prectenou ze `see`.
+def test_setting_read_does_not_make_write_settable_by_add():
+    # `write` nenastavene padne pri CTENI na `read`, ale vlastni ACL to neni -
+    # jinak by `write.add()` tise zmrazilo hodnotu prectenou z `read`.
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     with pytest.raises(ValueError):
         window.access.write.add("user:hana")
 
@@ -325,15 +325,15 @@ def test_setting_see_does_not_make_write_settable_by_add():
 def test_an_empty_own_acl_still_counts_as_owned():
     # `set([])` je rozhodnuti "nikdo", ne "nenastaveno" - add na nem projit ma.
     instance, _, window = prepared()
-    window.access.see.set([])
-    window.access.see.add("group:ucetni")
-    assert instance.objects.resolve(window.address, Verb.SEE) == Acl.of("group:ucetni")
+    window.access.read.set([])
+    window.access.read.add("group:ucetni")
+    assert instance.objects.resolve(window.address, Verb.READ) == Acl.of("group:ucetni")
 
 
 def test_reading_an_inheriting_acl_does_not_raise():
     # Cteni nesmi nikdy vybuchnout; vraci to, co na objektu STOJI.
     _, _, window = prepared()
-    assert window.access.see.list() == []
+    assert window.access.read.list() == []
 
 
 # -- dedeni a "nikdo" jsou dva ruzne stavy (F-14) --------------------------
@@ -341,13 +341,13 @@ def test_reading_an_inheriting_acl_does_not_raise():
 
 def test_an_inheriting_object_says_it_inherits():
     _, _, window = prepared()
-    assert window.access.see.inherits is True
+    assert window.access.read.inherits is True
 
 
 def test_an_object_with_its_own_acl_does_not_inherit():
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
-    assert window.access.see.inherits is False
+    window.access.read.set(["group:ucetni"])
+    assert window.access.read.inherits is False
 
 
 def test_an_explicitly_empty_acl_is_not_inheriting():
@@ -355,46 +355,46 @@ def test_an_explicitly_empty_acl_is_not_inheriting():
     # vyvojar nepozna zavrene okno od okna, ktere bere prava po plose - a ty
     # dva stavy maji pri dedicnosti opacne chovani.
     _, _, window = prepared()
-    window.access.see.set([])
-    assert window.access.see.inherits is False
-    assert window.access.see.list() == []
+    window.access.read.set([])
+    assert window.access.read.inherits is False
+    assert window.access.read.list() == []
 
 
-def test_write_inherits_even_when_see_is_set():
-    # Nenastavene write pri CTENI prav padne na see, ale vlastni ACL to neni.
+def test_write_inherits_even_when_read_is_set():
+    # Nenastavene write pri CTENI prav padne na read, ale vlastni ACL to neni.
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert window.access.write.inherits is True
 
 
 def test_screens_have_the_same_facade():
     instance = vb.Instance()
     screen = instance.screen.open(id="provoz")
-    screen.access.see.set(["group:ucetni"])
-    assert "group:ucetni" in instance.objects.resolve(screen.address, Verb.SEE)
+    screen.access.read.set(["group:ucetni"])
+    assert "group:ucetni" in instance.objects.resolve(screen.address, Verb.READ)
 
 
 def test_a_bare_name_becomes_a_group_here_too():
     instance, _, window = prepared()
-    window.access.see.set(["ucetni"])
-    assert "group:ucetni" in instance.objects.resolve(window.address, Verb.SEE)
+    window.access.read.set(["ucetni"])
+    assert "group:ucetni" in instance.objects.resolve(window.address, Verb.READ)
 
 
 def test_removing_a_principal_is_removal_from_the_allowed_not_a_ban():
     instance, _, window = prepared()
-    window.access.see.set(["group:ucetni", "group:public"])
-    window.access.see.remove("group:public")
-    assert instance.objects.resolve(window.address, Verb.SEE) == Acl.of("group:ucetni")
+    window.access.read.set(["group:ucetni", "group:public"])
+    window.access.read.remove("group:public")
+    assert instance.objects.resolve(window.address, Verb.READ) == Acl.of("group:ucetni")
 
 
 def test_reading_the_access_gives_a_snapshot():
     # Cteni vraci snimek, ne zivou mnozinu - jinak by sla prava zmenit mimo
     # instanci a auditni stopa by o tom nevedela.
     _, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
-    snapshot = window.access.see.list()
+    window.access.read.set(["group:ucetni"])
+    snapshot = window.access.read.list()
     snapshot.append("user:vetrelec")
-    assert window.access.see.list() == ["group:ucetni"]
+    assert window.access.read.list() == ["group:ucetni"]
 
 
 def test_the_public_surface_does_not_use_the_internal_name():
@@ -415,7 +415,7 @@ def test_the_public_property_reads_back():
 
 def test_changing_access_is_recorded():
     instance, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert any(record.address == window.address for record in instance.audit)
 
 
@@ -436,7 +436,7 @@ def test_the_require_authentication_change_is_recorded_too():
 def test_reading_the_access_is_not_an_audit_event():
     instance, _, window = prepared()
     before = len(instance.audit)
-    window.access.see.list()
+    window.access.read.list()
     assert len(instance.audit) == before
 
 
@@ -448,14 +448,14 @@ def test_every_audit_record_says_who_did_it():
     # chodit po drate, ponese totez pole skutecneho volajiciho a starsi
     # zaznamy pujdou porovnat s novejsimi.
     instance, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     window.access.require_authentication = True
     assert all(record.by for record in instance.audit)
 
 
 def test_a_change_from_library_code_is_recorded_as_internal():
     instance, _, window = prepared()
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert instance.audit[-1].by == "internal"
 
 
@@ -470,23 +470,23 @@ def test_an_unknown_principal_is_written_but_flagged():
     instance = vb.Instance(knows_principal=lambda name: name in seen)
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
 
-    window.access.see.set(["group:ucetnii"])  # preklep
+    window.access.read.set(["group:ucetnii"])  # preklep
 
-    assert "group:ucetnii" in instance.objects.resolve(window.address, Verb.SEE)
+    assert "group:ucetnii" in instance.objects.resolve(window.address, Verb.READ)
     assert any(record.action == "unknown_principal" for record in instance.audit)
 
 
 def test_a_known_principal_raises_no_flag():
     instance = vb.Instance(knows_principal=lambda name: name == "group:ucetni")
     window = instance.screen.open(id="provoz").window.open("panel", id="mzdy")
-    window.access.see.set(["group:ucetni"])
+    window.access.read.set(["group:ucetni"])
     assert not any(record.action == "unknown_principal" for record in instance.audit)
 
 
 def test_without_an_identity_source_nothing_is_flagged():
     # Zdroj identit, ktery odpovedet neumi, nesmi vyrabet varovani.
     instance, _, window = prepared()
-    window.access.see.set(["group:kdokoli"])
+    window.access.read.set(["group:kdokoli"])
     assert not any(record.action == "unknown_principal" for record in instance.audit)
 
 

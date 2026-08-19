@@ -8,8 +8,8 @@ z povolenych, ne zakaz.
 DVE SLOVESA, protoze "videt" a "zasahovat" jsou ruzne veci - verejne log
 okno, ktere smi vyprazdnit jen spravce:
 
-    see    ... kdo vidi obsah (co se vubec odesle po drate)
-    write  ... kdo smi posilat udalosti; nenastavene = totez co `see`
+    read   ... kdo vidi obsah (co se vubec odesle po drate)
+    write  ... kdo smi menit obsah; nenastavene = totez co `read`
 
 DEDICNOST misto vychoziho `group:public`: objekt bez ACL bere ACL sve plochy,
 plocha bere vychozi hodnotu instance. Default-open by znamenal, ze log okno
@@ -37,7 +37,7 @@ from .identity import ADMINISTRATOR, principal
 class Verb(Enum):
     """Dve slovesa pristupu. Vic jich neni a zamerne nepribyva."""
 
-    SEE = "see"
+    READ = "read"
     WRITE = "write"
 
 
@@ -90,19 +90,19 @@ class Access:
     `Acl` naopak znamena rozhodnuti "nikdo" a dedicnost ji neprepise.
     """
 
-    see: Acl | None = None
+    read: Acl | None = None
     write: Acl | None = None
     step_up: bool = False
 
     def for_verb(self, verb: Verb) -> Acl | None:
         """ACL pro sloveso, nebo None kdyz se ma dedit.
 
-        Nenastavene `write` padne na `see`: jinak by kazdy objekt potreboval
+        Nenastavene `write` padne na `read`: jinak by kazdy objekt potreboval
         obe ACL a vetsina by je mela stejne.
         """
         if verb is Verb.WRITE:
-            return self.write if self.write is not None else self.see
-        return self.see
+            return self.write if self.write is not None else self.read
+        return self.read
 
 
 def allowed(principals: Iterable[str], acl: Acl) -> bool:

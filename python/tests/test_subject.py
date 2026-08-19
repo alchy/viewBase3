@@ -16,7 +16,7 @@ import pytest
 
 import viewbase as vb
 from viewbase.core.identity import Caller
-from viewbase.runtime.content import AppBackend, ContentRefused, ContentState
+from viewbase.runtime.content import AppBackend, ContentState
 
 
 class RecordingApp:
@@ -38,17 +38,17 @@ class RecordingApp:
     def close_content(self, handle):
         pass
 
-    def list_content(self, subject):
-        self.subjects.append(subject)
-        return []
-
 
 class OwnershipApp(RecordingApp):
-    """Apka, ktera si hlida vlastnictvi obsahu - tedy kazda poradna apka."""
+    """Apka, ktera si vsima, kdo ji vola.
+
+    Po D-52 uz o pravech nerozhoduje - jen si to poznamena. Duvod, proc tenhle
+    dvojnik zustava: F-17 byl o tom, ze interni volani prislo jako 'anonymous',
+    a to plati dal.
+    """
 
     def open_content(self, handle, spec, subject):
-        if subject["subject_id"] == "anonymous":
-            raise ContentRefused("anonymnimu volajicimu obsah nezakladam")
+        assert subject["subject_id"] != "anonymous", "interni volani neni anonym"
         return super().open_content(handle, spec, subject)
 
 
@@ -81,7 +81,7 @@ def test_the_internal_caller_has_its_own_identity():
     assert backend.subjects[0]["subject_id"] == "service:instance"
 
 
-def test_an_app_that_refuses_anonymous_still_serves_the_library_code():
+def test_an_app_that_watches_who_calls_still_serves_the_library_code():
     # Tohle je ten bezny pripad, ne rohovy: kod aplikace otevre okno na svuj
     # vlastni obsah.
     _, screen = prepared(OwnershipApp())
@@ -94,8 +94,8 @@ def test_a_genuinely_anonymous_viewer_is_still_anonymous():
     backend = RecordingApp()
     _, screen = prepared(backend)
     window = screen.window.open("graph", id="net", app="workbench.graph")
-    window.access.see.set(["group:public"])
-    screen.access.see.set(["group:public"])
+    window.access.read.set(["group:public"])
+    screen.access.read.set(["group:public"])
 
     window.snapshot_for(Caller.anonymous())
 
@@ -107,11 +107,11 @@ def test_a_genuinely_anonymous_viewer_is_still_anonymous():
 # ===========================================================================
 
 
-def open_for(instance, screen, see, write):
-    screen.access.see.set(see)
+def open_for(instance, screen, read, write):
+    screen.access.read.set(read)
     screen.access.write.set(write)
     window = screen.window.open("graph", id="net", app="workbench.graph")
-    window.access.see.set(see)
+    window.access.read.set(read)
     window.access.write.set(write)
     return window
 
@@ -140,15 +140,15 @@ def test_capabilities_are_a_property_of_the_pair_not_of_the_caller():
     # Tyz clovek, dve okna na tyz obsah, ruzna prava - a tedy ruzne schopnosti.
     backend = RecordingApp()
     instance, screen = prepared(backend)
-    screen.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
 
     ctouci = screen.window.open("graph", id="a", app="workbench.graph")
-    ctouci.access.see.set(["group:users"])
+    ctouci.access.read.set(["group:users"])
     ctouci.access.write.set(["group:ucetni"])
 
     pisici = screen.window.open("graph", id="b", app="workbench.graph")
-    pisici.access.see.set(["group:users"])
+    pisici.access.read.set(["group:users"])
     pisici.access.write.set(["group:users"])
 
     hana = Caller.for_user("hana")
@@ -161,13 +161,13 @@ def test_capabilities_are_a_property_of_the_pair_not_of_the_caller():
     assert "write" in druhy
 
 
-def test_a_viewer_who_may_not_see_the_window_gets_no_snapshot():
+def test_a_viewer_without_read_on_the_window_gets_no_snapshot():
     instance, screen = prepared()
     window = open_for(instance, screen, ["group:ucetni"], ["group:ucetni"])
     assert window.snapshot_for(Caller.for_user("petr")) is None
 
 
-def test_the_snapshot_reaches_the_app_when_the_viewer_may_see():
+def test_the_snapshot_reaches_the_app_when_the_viewer_has_read():
     instance, screen = prepared()
     window = open_for(instance, screen, ["group:users"], ["group:users"])
     assert window.snapshot_for(Caller.for_user("hana")) is not None
@@ -181,12 +181,12 @@ def test_the_snapshot_reaches_the_app_when_the_viewer_may_see():
 def test_the_owner_of_the_content_may_manage_it():
     backend = RecordingApp()
     instance, screen = prepared(backend)
-    screen.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
     window = screen.window.open(
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
-    window.access.see.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:users"])
 
     window.snapshot_for(Caller.for_user("hana"))
@@ -197,12 +197,12 @@ def test_the_owner_of_the_content_may_manage_it():
 def test_someone_else_may_not_manage_it():
     backend = RecordingApp()
     instance, screen = prepared(backend)
-    screen.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
     window = screen.window.open(
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
-    window.access.see.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:users"])
 
     window.snapshot_for(Caller.for_user("petr"))
@@ -216,12 +216,12 @@ def test_the_administrator_reaches_a_foreign_content_through_a_capability():
     # a hlavne se NEDOZVI, jestli je to vlastnik, nebo spravce (D-49).
     backend = RecordingApp()
     instance, screen = prepared(backend)
-    screen.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
     window = screen.window.open(
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
-    window.access.see.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:users"])
 
     window.snapshot_for(Caller.for_user("spravce", ["administrator"]))
@@ -254,8 +254,10 @@ def test_the_protocol_declares_the_subject_on_open_content():
     assert parameters == ["self", "handle", "spec", "subject"]
 
 
-def test_the_protocol_knows_about_list_content():
-    assert hasattr(AppBackend, "list_content")
+def test_the_protocol_no_longer_lists_content():
+    # D-52: vyber obsahu filtrovany apkou zanikl spolu s tim, ze apka
+    # o pravech nerozhoduje nic.
+    assert not hasattr(AppBackend, "list_content")
 
 
 @pytest.mark.parametrize(
@@ -265,7 +267,6 @@ def test_the_protocol_knows_about_list_content():
         ("snapshot", ["self", "handle", "subject"]),
         ("apply_event", ["self", "handle", "subject", "event"]),
         ("close_content", ["self", "handle"]),
-        ("list_content", ["self", "subject"]),
     ],
 )
 def test_every_protocol_method_matches_what_the_runtime_calls(method, expected):
@@ -300,12 +301,12 @@ def test_the_app_is_never_told_a_role():
 def test_capabilities_come_out_in_the_declared_order():
     backend = RecordingApp()
     instance, screen = prepared(backend)
-    screen.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
     screen.access.write.set(["group:users"])
     window = screen.window.open(
         "graph", id="net", app="workbench.graph", by=Caller.for_user("hana")
     )
-    window.access.see.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:users"])
 
     assert window.capabilities_for(Caller.for_user("hana")) == ["read", "write", "manage"]

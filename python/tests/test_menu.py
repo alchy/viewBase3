@@ -40,7 +40,7 @@ class FakeApp:
 
 
 MENU = {
-    "refresh": {"type": "command", "needs": "see"},
+    "refresh": {"type": "command", "needs": "read"},
     "autosave": {"type": "toggle", "needs": "write"},
     "mode": {"type": "choice", "needs": "write", "options": ["rychly", "presny"]},
 }
@@ -178,8 +178,8 @@ def test_an_app_item_the_viewer_may_not_use_is_greyed_out_not_hidden():
     # Zasedla polozka rika "tohle jde, ale ne tobe" - a to je uzitecne prave
     # tam, kde objekt divak VIDI.
     instance, screen, window = prepared()
-    screen.access.see.set(["group:users"])
-    window.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:ucetni"])
     items = items_of(window.menu_for(Caller.for_user("hana")), "Hello")
     assert "autosave" in items
@@ -188,17 +188,17 @@ def test_an_app_item_the_viewer_may_not_use_is_greyed_out_not_hidden():
 
 def test_the_read_only_item_stays_usable_when_writing_does_not():
     instance, screen, window = prepared()
-    screen.access.see.set(["group:users"])
-    window.access.see.set(["group:users"])
+    screen.access.read.set(["group:users"])
+    window.access.read.set(["group:users"])
     window.access.write.set(["group:ucetni"])
     items = items_of(window.menu_for(Caller.for_user("hana")), "Hello")
     assert items["refresh"]["enabled"]
 
 
-def test_a_viewer_who_cannot_see_the_screen_gets_no_menu_at_all():
+def test_a_viewer_without_read_on_the_screen_gets_no_menu_at_all():
     # Objekt mimo ACL se chova, jako by neexistoval - vcetne jeho menu.
     instance, screen, window = prepared()
-    screen.access.see.set(["group:ucetni"])
+    screen.access.read.set(["group:ucetni"])
     assert window.menu_for(Caller.for_user("petr")) == []
 
 
@@ -227,7 +227,7 @@ def test_a_destructive_item_needs_at_least_write():
     with pytest.raises(ValueError, match="destructive"):
         instance.app.register(
             "x", kind="graph", scope="app", backend=FakeApp(), menu_group="X",
-            menu={"wipe": {"type": "command", "needs": "see", "destructive": True}},
+            menu={"wipe": {"type": "command", "needs": "read", "destructive": True}},
         )
 
 

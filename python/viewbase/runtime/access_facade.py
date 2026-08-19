@@ -4,7 +4,7 @@ Par. 4b rika, ze `Acl` je NEMENNA HODNOTA a meni se pres instanci - ta k ni
 muze pripojit kdo, kdy a proc. Par. 4a zaroven dokumentuje zapis, ktery se
 cte jako knihovna:
 
-    window.access.see.add("group:ucetni")
+    window.access.read.add("group:ucetni")
     window.access.write.set(["user:hana"])
     window.access.step_up = True
 
@@ -40,7 +40,7 @@ class AclView:
     na dedicim okne proslo, musi si vybrat mezi dvema vyklady a oba jsou
     spatne:
 
-      * zacit od VLASTNIHO (prazdneho): okno dedici see=[users] se po
+      * zacit od VLASTNIHO (prazdneho): okno dedici read=[users] se po
         add("group:ucetni") stane viditelnym JEN ucetnim - slovo "pridej"
         viditelnost zuzilo,
       * zacit od EFEKTIVNIHO: vyjde [users, ucetni], jak ctenar ceka, ale
@@ -122,12 +122,12 @@ class AccessFacade:
     o mechanismus a ctenarem je knihovna, ne autor aplikace (par. 4b).
     """
 
-    __slots__ = ("_owner", "_address", "see", "write")
+    __slots__ = ("_owner", "_address", "read", "write")
 
     def __init__(self, owner: AccessOwner, address: Address) -> None:
         object.__setattr__(self, "_owner", owner)
         object.__setattr__(self, "_address", address)
-        object.__setattr__(self, "see", AclView(owner, address, Verb.SEE))
+        object.__setattr__(self, "read", AclView(owner, address, Verb.READ))
         object.__setattr__(self, "write", AclView(owner, address, Verb.WRITE))
 
     @property
